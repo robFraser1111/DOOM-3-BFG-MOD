@@ -2627,7 +2627,7 @@ idWindow::EmitOp
 ================
 */
 
-int idWindow::EmitOp( int a, int b, wexpOpType_t opType, wexpOp_t **opp ) {
+int idWindow::EmitOp( intptr_t a, int b, wexpOpType_t opType, wexpOp_t **opp ) {
 	wexpOp_t *op;
 /*
 	// optimize away identity operations
@@ -2678,7 +2678,7 @@ int idWindow::EmitOp( int a, int b, wexpOpType_t opType, wexpOp_t **opp ) {
 idWindow::ParseEmitOp
 ================
 */
-int idWindow::ParseEmitOp( idTokenParser *src, int a, wexpOpType_t opType, int priority, wexpOp_t **opp ) {
+int idWindow::ParseEmitOp( idTokenParser *src, intptr_t a, wexpOpType_t opType, int priority, wexpOp_t **opp ) {
 	int b = ParseExpressionPriority( src, priority );
 	return EmitOp( a, b, opType, opp );  
 }
@@ -2693,7 +2693,8 @@ Returns a register index
 */
 int idWindow::ParseTerm( idTokenParser *src,	idWinVar *var, int component ) {
 	idToken token;
-	int		a, b;
+	intptr_t	a;
+	int			b;
 
 	src->ReadToken( &token );
 
@@ -2736,7 +2737,7 @@ int idWindow::ParseTerm( idTokenParser *src,	idWinVar *var, int component ) {
 		var = GetWinVarByName(token, true);
 	}
 	if (var) {
-		a = (int)var;
+		a = (intptr_t)var;
 		//assert(dynamic_cast<idWinVec4*>(var));
 		var->Init(token, this);
 		b = component;
@@ -2766,7 +2767,7 @@ int idWindow::ParseTerm( idTokenParser *src,	idWinVar *var, int component ) {
 		// ugly but used for post parsing to fixup named vars
 		char *p = new (TAG_OLD_UI) char[token.Length()+1];
 		strcpy(p, token);
-		a = (int)p;
+		a = (intptr_t)p;
 		b = -2;
 		return EmitOp(a, b, WOP_TYPE_VAR);
 	}
@@ -2971,15 +2972,16 @@ void idWindow::EvaluateRegisters(float *registers) {
 			}
 			if ( op->b >= 0 && registers[op->b] >= 0 && registers[op->b] < 4 ) {
 				// grabs vector components
-				idWinVec4 *var = (idWinVec4 *)( op->a );
-				registers[op->c] = ((idVec4&)var)[registers[op->b]];
+				idWinVec4 *var = (idWinVec4 *)op->a;
+				const idVec4 &value = *var;
+				registers[op->c] = value[(int)registers[op->b]];
 			} else {
-				registers[op->c] = ((idWinVar*)(op->a))->x();
+				registers[op->c] = ((idWinVar*)op->a)->x();
 			}
 			break;
 		case WOP_TYPE_VARS:
 			if (op->a) {
-				idWinStr *var = (idWinStr*)(op->a);
+				idWinStr *var = (idWinStr*)op->a;
 				registers[op->c] = atof(var->c_str());
 			} else {
 				registers[op->c] = 0;
@@ -2987,7 +2989,7 @@ void idWindow::EvaluateRegisters(float *registers) {
 			break;
 		case WOP_TYPE_VARF:
 			if (op->a) {
-				idWinFloat *var = (idWinFloat*)(op->a);
+				idWinFloat *var = (idWinFloat*)op->a;
 				registers[op->c] = *var;
 			} else {
 				registers[op->c] = 0;
@@ -2995,7 +2997,7 @@ void idWindow::EvaluateRegisters(float *registers) {
 			break;
 		case WOP_TYPE_VARI:
 			if (op->a) {
-				idWinInt *var = (idWinInt*)(op->a);
+				idWinInt *var = (idWinInt*)op->a;
 				registers[op->c] = *var;
 			} else {
 				registers[op->c] = 0;
@@ -3003,7 +3005,7 @@ void idWindow::EvaluateRegisters(float *registers) {
 			break;
 		case WOP_TYPE_VARB:
 			if (op->a) {
-				idWinBool *var = (idWinBool*)(op->a);
+				idWinBool *var = (idWinBool*)op->a;
 				registers[op->c] = *var;
 			} else {
 				registers[op->c] = 0;
@@ -3742,10 +3744,10 @@ void idWindow::FixupParms() {
 	for (i = 0; i < c; i++) {
 		if (ops[i].b == -2) {
 			// need to fix this up
-			const char *p = (const char*)(ops[i].a);
+			const char *p = (const char*)ops[i].a;
 			idWinVar *var = GetWinVarByName(p, true);
 			delete []p;
-			ops[i].a = (int)var;
+			ops[i].a = (intptr_t)var;
 			ops[i].b = -1;
 		}
 	}

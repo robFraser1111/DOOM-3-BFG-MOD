@@ -1700,6 +1700,24 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 				name = symbol->Name;
 			}
 
+			const char *sourceFile = NULL;
+			DWORD sourceLine = 0;
+			IMAGEHLP_LINE64 lineInfo;
+			DWORD lineDisplacement = 0;
+			memset( &lineInfo, 0, sizeof( lineInfo ) );
+			lineInfo.SizeOfStruct = sizeof( IMAGEHLP_LINE64 );
+			if ( SymGetLineFromAddr64( process, frame.AddrPC.Offset, &lineDisplacement, &lineInfo ) && lineInfo.FileName != NULL ) {
+				sourceFile = lineInfo.FileName;
+				const char *fileSlash = strrchr( sourceFile, '\\' );
+				if ( fileSlash == NULL ) {
+					fileSlash = strrchr( sourceFile, '/' );
+				}
+				if ( fileSlash != NULL ) {
+					sourceFile = fileSlash + 1;
+				}
+				sourceLine = lineInfo.LineNumber;
+			}
+
 			char frameModule[MAX_PATH];
 			frameModule[0] = '\0';
 			const char *frameName = "";
@@ -1716,7 +1734,11 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 				frameOffset = (unsigned long long)( frame.AddrPC.Offset - (DWORD64)(uintptr_t)frameMod );
 			}
 
-			Sys_Format( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
+			if ( sourceFile != NULL ) {
+				Sys_Format( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x  %s:%lu\r\n", frameName, frameOffset, name, (unsigned long long)displacement, sourceFile, sourceLine );
+			} else {
+				Sys_Format( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
+			}
 			line[sizeof( line ) - 1] = '\0';
 			Sys_WriteCrashText( file, line );
 		}

@@ -105,8 +105,11 @@ typedef enum {
 } wexpRegister_t;
 
 typedef struct {
-	wexpOpType_t opType;	
-	int	a, b, c, d;
+	wexpOpType_t opType;
+	// a is a register index, a decl index, or an idWinVar* / name string while parsing.
+	// b, c and d are register indexes (b is also -1 or -2). They are pointer-sized
+	// so the idWinVar* stored in a is not truncated on x64.
+	intptr_t	a, b, c, d;
 } wexpOp_t;
 
 struct idRegEntry {
@@ -347,8 +350,8 @@ protected:
 
 	int ExpressionTemporary();
 	wexpOp_t *ExpressionOp();
-	int EmitOp( int a, int b, wexpOpType_t opType, wexpOp_t **opp = NULL );
-	int ParseEmitOp( idTokenParser *src, int a, wexpOpType_t opType, int priority, wexpOp_t **opp = NULL );
+	int EmitOp( intptr_t a, int b, wexpOpType_t opType, wexpOp_t **opp = NULL );
+	int ParseEmitOp( idTokenParser *src, intptr_t a, wexpOpType_t opType, int priority, wexpOp_t **opp = NULL );
 	int ParseTerm( idTokenParser *src, idWinVar *var = NULL, int component = 0 );
 	int ParseExpressionPriority( idTokenParser *src, int priority, idWinVar *var = NULL, int component = 0 );
 	void EvaluateRegisters(float *registers);
