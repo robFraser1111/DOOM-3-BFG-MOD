@@ -14,7 +14,7 @@
       <IgnoreSpecificDefaultLibraries>libcmt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <Link>
-      <AdditionalDependencies>xaudio2.lib;x3daudio.lib;xinput.lib;dbghelp.lib;dinput8.lib;dsound.lib;dxguid.lib;ole32.lib;propsys.lib;glu32.lib;iphlpapi.lib;odbc32.lib;odbccp32.lib;opengl32.lib;winmm.lib;wsock32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>xaudio2.lib;xinput.lib;dbghelp.lib;dinput8.lib;dsound.lib;dxguid.lib;ole32.lib;propsys.lib;glu32.lib;iphlpapi.lib;odbc32.lib;odbccp32.lib;opengl32.lib;winmm.lib;wsock32.lib;wbemuuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
     </Link>
     <ClCompile>
