@@ -36,7 +36,9 @@ If you have questions concerning this license or the applicable additional terms
 //===============================================================
 
 float	idVecX::temp[VECX_MAX_TEMP+4];
-float *	idVecX::tempPtr = (float *) ( ( (int) idVecX::temp + 15 ) & ~15 );
+// Align the static scratch buffer. The address must stay pointer-sized;
+// casting through int drops the high half on x64 and the next idVecX temp use faults.
+float *	idVecX::tempPtr = (float *) ( ( (uintptr_t) idVecX::temp + 15 ) & ~(uintptr_t)15 );
 int		idVecX::tempIndex = 0;
 
 /*

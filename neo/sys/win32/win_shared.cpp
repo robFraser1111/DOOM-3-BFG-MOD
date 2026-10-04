@@ -317,7 +317,7 @@ typedef struct symbol_s {
 } symbol_t;
 
 typedef struct module_s {
-	int					address;
+	uintptr_t			address;
 	char *				name;
 	symbol_t *			symbols;
 	struct module_s *	next;
@@ -374,7 +374,7 @@ int ParseHexNumber( const char **ptr ) {
 Sym_Init
 ==================
 */
-void Sym_Init( long addr ) {
+void Sym_Init( address_t addr ) {
 	TCHAR moduleName[MAX_STRING_CHARS];
 	MEMORY_BASIC_INFORMATION mbi;
 
@@ -395,7 +395,7 @@ void Sym_Init( long addr ) {
 	module_t *module = (module_t *) malloc( sizeof( module_t ) );
 	module->name = (char *) malloc( strlen( moduleName ) + 1 );
 	strcpy( module->name, moduleName );
-	module->address = (int)mbi.AllocationBase;
+	module->address = (uintptr_t)mbi.AllocationBase;
 	module->symbols = NULL;
 	module->next = modules;
 	modules = module;
@@ -510,7 +510,7 @@ void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	VirtualQuery( (void*)addr, &mbi, sizeof(mbi) );
 
 	for ( m = modules; m != NULL; m = m->next ) {
-		if ( m->address == (int) mbi.AllocationBase ) {
+		if ( m->address == (uintptr_t)mbi.AllocationBase ) {
 			break;
 		}
 	}
@@ -681,6 +681,12 @@ GetFuncAddr
 ==================
 */
 address_t GetFuncAddr( address_t midPtPtr ) {
+#if defined( _M_X64 )
+	// The scan below looks for the x86 frame prologue (push ebp / mov ebp, esp).
+	// x64 frames do not use it, and walking backward from a return address is unsafe.
+	(void)midPtPtr;
+	return 0;
+#else
 	long temp;
 	do {
 		temp = (long)(*(long*)midPtPtr);
@@ -691,6 +697,7 @@ address_t GetFuncAddr( address_t midPtPtr ) {
 	} while(true);
 
 	return midPtPtr;
+#endif
 }
 
 /*

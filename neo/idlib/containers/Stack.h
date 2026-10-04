@@ -37,7 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 ===============================================================================
 */
 
-#define idStack( type, next )		idStackTemplate<type, (int)&(((type*)NULL)->next)>
+#define idStack( type, next )		idStackTemplate<type, (int)offsetof( type, next )>
 
 template< class type, int nextOffset >
 class idStackTemplate {

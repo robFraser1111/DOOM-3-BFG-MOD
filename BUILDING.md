@@ -80,6 +80,35 @@ An unhandled crash writes `crash.txt` and `crash.dmp` there too: exception
 code, faulting module and offset, and a DbgHelp stack. Those three files are
 the ones to keep if the process dies before a window appears.
 
+## x64 pointer-width audit
+
+The engine was read for the usual 32-bit assumptions: pointers stored in or cast through `int`, `long`, `unsigned`, `DWORD`, or `uint32`; pointer differences stored in `int`; `sizeof(void*) == 4` in structs, unions, and file or network formats; 32-bit offset and size math; Win32 handles (`HANDLE`, `HWND`, `HINSTANCE`, `_findfirst`); `printf` formats; inline assembly and x87/SSE assumptions; and alignment masks. The sweep covered `neo/idlib`, `framework`, `renderer`, `ui`, `sound`, `swf`, `sys`, `d3xp`, `cm`, `aas`, and `doomclassic` (it is linked into the executable).
+
+Fixed, including the earlier startup and Lost Mission crashes:
+
+- `_findfirst` is an `intptr_t` on x64. `Sys_ListFiles` keeps that handle intact.
+- DLL `HINSTANCE` values passed through `idSys` are `intptr_t`.
+- File tell, seek, and length use `SetFilePointerEx` and `GetFileSizeEx`. A file larger than 2GB reports length -1 instead of a wrapped size.
+- GUI expression ops (`wexpOp_t`) store an `idWinVar*` in `intptr_t`. That was the Lost Mission crash in `idWindow::EvaluateRegisters`.
+- `idVecX::tempPtr` and `idMatX::tempPtr` align their static scratch buffers with `uintptr_t`. The old `(int)` cast dropped the high half of the address. The constraint solver uses those temps.
+- LCP and frame-allocator alignment tests mask the full address. Only the low bits matter, and the mask no longer truncates first.
+- The AAS travel-time check subtracts the two pointers. It used to subtract them after casting each to `unsigned int`.
+- Window procedures return `LRESULT`. The early console returns its `HBRUSH` without cutting it down to 32 bits.
+- GUI transition offsets use `offsetof` and stay `int`. A window object is far smaller than 2GB, so the offset fits.
+- The debug map-file symbolizer stores a module base as `uintptr_t`. The x86 prologue walk and the `ID_WIN_X86_ASM` blocks are not compiled for x64.
+
+`C4311`, `C4312`, and `C4302` (pointer truncated to 32 bits, or a 32-bit int widened to a pointer) are enabled, and the engine projects treat warnings as errors. `C4244`, `C4267`, `C4477`, and `C4838` stay disabled. Turning those on fails the build on the existing float-to-int, `size_t`-to-int, `printf`, and narrowing conversions. Those sites were read and left alone when they were numeric, not pointer-width bugs.
+
+Still true after the audit:
+
+- Resource, zip, and `idFile` offsets are 32-bit because that is the file format. The Steam resource files are under 2GB. A modded file past 2GB will not load.
+- SWF `Length` and `Tell` cast a pointer difference to `uint32`. The shipped Flash files are small.
+- Event integer and float arguments are stored as 32-bit values. Entity, string, and trace arguments keep the full pointer.
+- Vertex-cache handles pack fields into a `uint64` and unpack them through `int`. Each field mask fits in 31 bits.
+- x64 compiles float and double as SSE2, not 80-bit x87. See the math note below.
+- Release `crash.txt` uses DbgHelp. The debug-only `.map` parser still stores per-symbol addresses from the map file as `int`, and it is not in the Release executable.
+- A heap pointer-range check that cast pointers to `int` is inside a block comment and is not compiled.
+
 ## Known limitations
 
 - **No Steam.** No overlay, achievements, leaderboards, matchmaking, or roaming
