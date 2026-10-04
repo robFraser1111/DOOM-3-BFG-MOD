@@ -33,21 +33,27 @@ If you have questions concerning this license or the applicable additional terms
 #include "../Game_local.h"
 
 // simple types.  function types are dynamically allocated
+//
+// Stack slots are pointer-sized. The value in a float, bool, entity, or object
+// slot is still 32 bits (a float, or an entity number) in the low half. Push()
+// advances sizeof(intptr_t), and parmTotal / locals count the same bytes. On
+// x64, sizeof(void*) made entity and object look 8 bytes wide while Push() only
+// wrote 4, so player::init popped more than it had pushed.
 idTypeDef	type_void( ev_void, &def_void, "void", 0, NULL );
-idTypeDef	type_scriptevent( ev_scriptevent, &def_scriptevent, "scriptevent", sizeof( void * ), NULL );
-idTypeDef	type_namespace( ev_namespace, &def_namespace, "namespace", sizeof( void * ), NULL );
+idTypeDef	type_scriptevent( ev_scriptevent, &def_scriptevent, "scriptevent", sizeof( intptr_t ), NULL );
+idTypeDef	type_namespace( ev_namespace, &def_namespace, "namespace", sizeof( intptr_t ), NULL );
 idTypeDef	type_string( ev_string, &def_string, "string", MAX_STRING_LEN, NULL );
-idTypeDef	type_float( ev_float, &def_float, "float", sizeof( float ), NULL );
-idTypeDef	type_vector( ev_vector, &def_vector, "vector", sizeof( idVec3 ), NULL );
-idTypeDef	type_entity( ev_entity, &def_entity, "entity", sizeof( int * ), NULL );					// stored as entity number pointer
-idTypeDef	type_field( ev_field, &def_field, "field", sizeof( void * ), NULL );
-idTypeDef	type_function( ev_function, &def_function, "function", sizeof( void * ), &type_void );
-idTypeDef	type_virtualfunction( ev_virtualfunction, &def_virtualfunction, "virtual function", sizeof( int ), NULL );
-idTypeDef	type_pointer( ev_pointer, &def_pointer, "pointer", sizeof( void * ), NULL );
-idTypeDef	type_object( ev_object, &def_object, "object", sizeof( int * ), NULL );					// stored as entity number pointer
-idTypeDef	type_jumpoffset( ev_jumpoffset, &def_jumpoffset, "<jump>", sizeof( int ), NULL );		// only used for jump opcodes
-idTypeDef	type_argsize( ev_argsize, &def_argsize, "<argsize>", sizeof( int ), NULL );				// only used for function call and thread opcodes
-idTypeDef	type_boolean( ev_boolean, &def_boolean, "boolean", sizeof( int ), NULL );
+idTypeDef	type_float( ev_float, &def_float, "float", sizeof( intptr_t ), NULL );
+idTypeDef	type_vector( ev_vector, &def_vector, "vector", E_EVENT_SIZEOF_VEC, NULL );
+idTypeDef	type_entity( ev_entity, &def_entity, "entity", sizeof( intptr_t ), NULL );					// entity number in the low 32 bits
+idTypeDef	type_field( ev_field, &def_field, "field", sizeof( intptr_t ), NULL );
+idTypeDef	type_function( ev_function, &def_function, "function", sizeof( intptr_t ), &type_void );
+idTypeDef	type_pointer( ev_pointer, &def_pointer, "pointer", sizeof( intptr_t ), NULL );
+idTypeDef	type_object( ev_object, &def_object, "object", sizeof( intptr_t ), NULL );					// entity number in the low 32 bits
+idTypeDef	type_jumpoffset( ev_jumpoffset, &def_jumpoffset, "<jump>", sizeof( intptr_t ), NULL );		// only used for jump opcodes
+idTypeDef	type_argsize( ev_argsize, &def_argsize, "<argsize>", sizeof( intptr_t ), NULL );			// only used for function call and thread opcodes
+idTypeDef	type_boolean( ev_boolean, &def_boolean, "boolean", sizeof( intptr_t ), NULL );
+idTypeDef	type_virtualfunction( ev_virtualfunction, &def_virtualfunction, "virtual function", sizeof( intptr_t ), NULL );
 
 idVarDef	def_void( &type_void );
 idVarDef	def_scriptevent( &type_scriptevent );
@@ -1217,6 +1223,40 @@ void idProgram::AddDefToNameList( idVarDef *def, const char *name ) {
 }
 
 /*
+==============
+idProgram::ReserveMem
+
+Reserves memory for global variables and returns the starting pointer.
+==============
+*/
+byte *idProgram::ReserveMem( int size ) {
+	byte *res = &variables[ numVariables ];
+	numVariables += size;
+	if ( numVariables > (int)sizeof( variables ) ) {
+		throw idCompileError( va( "Exceeded global memory size (%d bytes)", (int)sizeof( variables ) ) );
+	}
+
+	memset( res, 0, size );
+	return res;
+}
+
+/*
+============
+idProgram::AllocVarDef
+
+Allocates the def only. The caller places it on the stack or in global memory.
+============
+*/
+idVarDef *idProgram::AllocVarDef( idTypeDef *type, const char *name, idVarDef *scope ) {
+	idVarDef *def = new (TAG_SCRIPT) idVarDef( type );
+	def->scope		= scope;
+	def->numUsers	= 1;
+	def->num		= varDefs.Append( def );
+	AddDefToNameList( def, name );
+	return def;
+}
+
+/*
 ============
 idProgram::AllocDef
 ============
@@ -1249,38 +1289,54 @@ idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scop
 			scope->value.functionPtr->locals += type->Size();
 		} else if ( scope->TypeDef()->Inherits( &type_object ) ) {
 			idTypeDef	newtype( ev_field, NULL, "float field", 0, &type_float );
-			idTypeDef	*type = GetType( newtype, true );
+			idTypeDef	*ftype = GetType( newtype, true );
 
 			// set the value to the variable's position in the object
 			def->value.ptrOffset = scope->TypeDef()->Size();
 
 			// make automatic defs for the vectors elements
 			// origin can be accessed as origin_x, origin_y, and origin_z
+			// Components stay sizeof(float) apart inside the idVec3, even though
+			// a standalone float slot is pointer-sized.
 			sprintf( element, "%s_x", def->Name() );
-			def_x = AllocDef( type, element, scope, constant );
+			def_x = AllocDef( ftype, element, scope, constant );
 
 			sprintf( element, "%s_y", def->Name() );
-			def_y = AllocDef( type, element, scope, constant );
-			def_y->value.ptrOffset = def_x->value.ptrOffset + type_float.Size();
+			def_y = AllocDef( ftype, element, scope, constant );
+			def_y->value.ptrOffset = def_x->value.ptrOffset + sizeof( float );
 
 			sprintf( element, "%s_z", def->Name() );
-			def_z = AllocDef( type, element, scope, constant );
-			def_z->value.ptrOffset = def_y->value.ptrOffset + type_float.Size();
+			def_z = AllocDef( ftype, element, scope, constant );
+			def_z->value.ptrOffset = def_y->value.ptrOffset + sizeof( float );
 		} else {
-			// make automatic defs for the vectors elements
-			// origin can be accessed as origin_x, origin_y, and origin_z
+			// One vector slot. _x, _y and _z alias the packed floats inside it.
 			sprintf( element, "%s_x", def->Name() );
-			def_x = AllocDef( &type_float, element, scope, constant );
+			def_x = AllocVarDef( &type_float, element, scope );
 
 			sprintf( element, "%s_y", def->Name() );
-			def_y = AllocDef( &type_float, element, scope, constant );
+			def_y = AllocVarDef( &type_float, element, scope );
 
 			sprintf( element, "%s_z", def->Name() );
-			def_z = AllocDef( &type_float, element, scope, constant );
+			def_z = AllocVarDef( &type_float, element, scope );
 
-			// point the vector def to the x coordinate
-			def->value			= def_x->value;
-			def->initialized	= def_x->initialized;
+			if ( scope->Type() == ev_function ) {
+				def->value.stackOffset	= scope->value.functionPtr->locals;
+				def->initialized		= idVarDef::stackVariable;
+				scope->value.functionPtr->locals += type->Size();
+
+				def_x->value.stackOffset = def->value.stackOffset;
+				def_y->value.stackOffset = def_x->value.stackOffset + sizeof( float );
+				def_z->value.stackOffset = def_y->value.stackOffset + sizeof( float );
+			} else {
+				def->value.bytePtr = ReserveMem( type->Size() );
+				def_x->value.bytePtr = def->value.bytePtr;
+				def_y->value.bytePtr = def_x->value.bytePtr + sizeof( float );
+				def_z->value.bytePtr = def_y->value.bytePtr + sizeof( float );
+			}
+
+			def_x->initialized = def->initialized;
+			def_y->initialized = def->initialized;
+			def_z->initialized = def->initialized;
 		}
 	} else if ( scope->TypeDef()->Inherits( &type_object ) ) {
 		//
@@ -1307,13 +1363,7 @@ idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scop
 		//
 		// global variable
 		//
-		def->value.bytePtr = &variables[ numVariables ];
-		numVariables += def->TypeDef()->Size();
-		if ( numVariables > sizeof( variables ) ) {
-			throw idCompileError( va( "Exceeded global memory size (%d bytes)", sizeof( variables ) ) );
-		}
-
-		memset( def->value.bytePtr, 0, def->TypeDef()->Size() );
+		def->value.bytePtr = ReserveMem( def->TypeDef()->Size() );
 	}
 
 	return def;

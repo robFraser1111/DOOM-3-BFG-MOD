@@ -98,6 +98,7 @@ Fixed, including the earlier startup and Lost Mission crashes:
 - The debug map-file symbolizer stores a module base as `uintptr_t`. The x86 prologue walk and the `ID_WIN_X86_ASM` blocks are not compiled for x64.
 - Classic Doom colormaps and translation tables align with `uintptr_t`. The old `(int)` alignment dropped the high half of the allocation. Savegame indexes that lived in pointer fields are read back with `intptr_t`. The cvar "not registered yet" marker is `0xFFFFFFFF` widened through `uintptr_t`, not a real `idCVar*`.
 - OpenGL buffer names are `GLuint`, not `void*`. Vertex, index, and joint buffers store the name directly. CPU speed reads the registry `~MHz` DWORD into a `DWORD` instead of into a pointer variable.
+- The game script VM stores entity numbers, floats, and bools in the low 32 bits of a pointer-sized stack slot. `Push` advances `sizeof(intptr_t)`, and the compiler's `parmTotal` / `locals` use that same width (`idTypeDef::Size()`). Vectors stay packed `idVec3`s, padded out to a pointer boundary, with `_x` / `_y` / `_z` still 4 bytes apart. A script error in Release prints `localstackUsed`, `localstackBase`, and `callStackDepth` before the stack trace. The trace no longer reads one past the last frame (that was the extra `<NO FUNCTION>` line).
 
 `C4311`, `C4312`, and `C4302` (pointer truncated to 32 bits, or a 32-bit int widened to a pointer) are enabled, and the engine projects treat warnings as errors. `C4244`, `C4267`, `C4477`, and `C4838` stay disabled. Turning those on fails the build on the existing float-to-int, `size_t`-to-int, `printf`, and narrowing conversions. Those sites were read and left alone when they were numeric, not pointer-width bugs.
 
@@ -105,7 +106,7 @@ Still true after the audit:
 
 - Resource, zip, and `idFile` offsets are 32-bit because that is the file format. The Steam resource files are under 2GB. A modded file past 2GB will not load.
 - SWF `Length` and `Tell` cast a pointer difference to `uint32`. The shipped Flash files are small.
-- Event integer and float arguments are stored as 32-bit values. Entity, string, and trace arguments keep the full pointer.
+- Queued event arguments are not the script stack. Integer and float args are 32-bit. An `'e'` / `'E'` arg is an `idEntityPtr` spawn id (also 32-bit), not a native pointer; the callback receives the looked-up `idEntity*`. A `'v'` arg in the event blob is a packed `idVec3`. String and trace args keep their pointers.
 - Vertex-cache handles pack fields into a `uint64` and unpack them through `int`. Each field mask fits in 31 bits.
 - x64 compiles float and double as SSE2, not 80-bit x87. See the math note below.
 - Release `crash.txt` uses DbgHelp. The debug-only `.map` parser still stores per-symbol addresses from the map file as `int`, and it is not in the Release executable.

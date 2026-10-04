@@ -84,6 +84,12 @@ idEventDef::idEventDef( const char *command, const char *formatspec, char return
 		return;
 	}
 
+	// Queued event data is not the script stack. 'd' and 'f' are 32-bit. 'e'/'E'
+	// are an idEntityPtr spawn id (also 32-bit), not a native idEntity*. 'v' is a
+	// packed idVec3. The script VM turns an entity number into an idEntity* only
+	// when it calls ProcessEventArgPtr. Save/Restore below uses these same widths.
+	static_assert( sizeof( idEntityPtr<idEntity> ) == sizeof( int ), "event entity arg is a 32-bit spawn id" );
+
 	// make sure the format for the args is valid, calculate the formatspecindex, and the offsets for each arg
 	bits = 0;
 	argsize = 0;

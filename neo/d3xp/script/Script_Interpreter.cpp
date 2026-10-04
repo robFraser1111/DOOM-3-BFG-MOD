@@ -391,28 +391,24 @@ idInterpreter::StackTrace
 void idInterpreter::StackTrace() const {
 	const function_t	*f;
 	int 				i;
-	int					top;
 
 	if ( callStackDepth == 0 ) {
 		gameLocal.Printf( "<NO STACK>\n" );
 		return;
 	}
 
-	top = callStackDepth;
-	if ( top >= MAX_STACK_DEPTH ) {
-		top = MAX_STACK_DEPTH - 1;
-	}
-	
 	if ( !currentFunction ) {
 		gameLocal.Printf( "<NO FUNCTION>\n" );
 	} else {
 		gameLocal.Printf( "%12s : %s\n", gameLocal.program.GetFilename( currentFunction->filenum ), currentFunction->Name() );
 	}
 
-	for( i = top; i >= 0; i-- ) {
+	// Valid frames are [0, callStackDepth). callStack[callStackDepth] was never written.
+	// Frame 0 is NULL when C++ entered the thread, which is not a missing function.
+	for( i = callStackDepth - 1; i >= 0; i-- ) {
 		f = callStack[ i ].f;
 		if ( !f ) {
-			gameLocal.Printf( "<NO FUNCTION>\n" );
+			gameLocal.Printf( "<native caller>\n" );
 		} else {
 			gameLocal.Printf( "%12s : %s\n", gameLocal.program.GetFilename( f->filenum ), f->Name() );
 		}
@@ -434,6 +430,7 @@ void idInterpreter::Error( const char *fmt, ... ) const {
 	vsprintf( text, fmt, argptr );
 	va_end( argptr );
 
+	gameLocal.Printf( "script stack: localstackUsed %d, localstackBase %d, callStackDepth %d\n", localstackUsed, localstackBase, callStackDepth );
 	StackTrace();
 
 	if ( ( instructionPointer >= 0 ) && ( instructionPointer < gameLocal.program.NumStatements() ) ) {
@@ -489,11 +486,11 @@ void idInterpreter::DisplayInfo() const {
 			gameLocal.Printf( "%12s : %s\n", gameLocal.program.GetFilename( currentFunction->filenum ), currentFunction->Name() );
 		}
 
-		for( i = callStackDepth; i > 0; i-- ) {
+		for( i = callStackDepth - 1; i >= 0; i-- ) {
 			gameLocal.Printf( "              " );
 			f = callStack[ i ].f;
 			if ( !f ) {
-				gameLocal.Printf( "<NO FUNCTION>\n" );
+				gameLocal.Printf( "<native caller>\n" );
 			} else {
 				gameLocal.Printf( "%12s : %s\n", gameLocal.program.GetFilename( f->filenum ), f->Name() );
 			}
@@ -703,6 +700,8 @@ void idInterpreter::CallEvent( const function_t *func, int argsize ) {
 	assert( func->eventdef );
 	evdef = func->eventdef;
 
+	memset( data, 0, sizeof( data ) );
+
 	start = localstackUsed - argsize;
 	var.intPtr = ( int * )&localstack[ start ];
 	eventEntity = GetEntity( *var.entityNumberPtr );
@@ -874,6 +873,8 @@ void idInterpreter::CallSysEvent( const function_t *func, int argsize ) {
 
 	assert( func->eventdef );
 	evdef = func->eventdef;
+
+	memset( data, 0, sizeof( data ) );
 
 	start = localstackUsed - argsize;
 
@@ -1815,9 +1816,7 @@ bool idInterpreter::Execute() {
 
 		case OP_PUSH_V:
 			var_a = GetVariable( st->a );
-			Push( *reinterpret_cast<int *>( &var_a.vectorPtr->x ) );
-			Push( *reinterpret_cast<int *>( &var_a.vectorPtr->y ) );
-			Push( *reinterpret_cast<int *>( &var_a.vectorPtr->z ) );
+			PushVector( *var_a.vectorPtr );
 			break;
 
 		case OP_PUSH_OBJ:

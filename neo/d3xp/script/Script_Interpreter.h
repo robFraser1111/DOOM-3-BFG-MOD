@@ -30,7 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 #define __SCRIPT_INTERPRETER_H__
 
 #define MAX_STACK_DEPTH 	64
-#define LOCALSTACK_SIZE 	6144
+// Slots are pointer-sized on x64, so the same script needs more bytes than the 32-bit VM.
+#define LOCALSTACK_SIZE 	( 6144 * 2 )
 
 typedef struct prstack_s {
 	int 				s;
@@ -60,6 +61,7 @@ private:
 
 	void				PopParms( int numParms );
 	void				PushString( const char *string );
+	void				PushVector( const idVec3 &vector );
 	void				Push( int value );
 	const char			*FloatToString( float value );
 	void				AppendString( idVarDef *def, const char *from );
@@ -124,7 +126,7 @@ idInterpreter::PopParms
 ID_INLINE void idInterpreter::PopParms( int numParms ) {
 	// pop our parms off the stack
 	if ( localstackUsed < numParms ) {
-		Error( "locals stack underflow\n" );
+		Error( "locals stack underflow (pop %d)\n", numParms );
 	}
 
 	localstackUsed -= numParms;
@@ -133,14 +135,35 @@ ID_INLINE void idInterpreter::PopParms( int numParms ) {
 /*
 ====================
 idInterpreter::Push
+
+Writes a 32-bit script value (entity number, float bits, or bool) and advances
+one pointer-sized slot. Readers load the low 32 bits through int* or float*.
+The slot is pointer-sized so it matches idTypeDef::Size() and so OP_ADDRESS
+can store a real pointer in a result that was allocated as that type.
 ====================
 */
 ID_INLINE void idInterpreter::Push( int value ) {
-	if ( localstackUsed + sizeof( int ) > LOCALSTACK_SIZE ) {
+	if ( localstackUsed + sizeof( intptr_t ) > LOCALSTACK_SIZE ) {
 		Error( "Push: locals stack overflow\n" );
 	}
-	*( int * )&localstack[ localstackUsed ]	= value;
-	localstackUsed += sizeof( int );
+	intptr_t stored = 0;
+	*( int * )&stored = value;
+	*( intptr_t * )&localstack[ localstackUsed ] = stored;
+	localstackUsed += sizeof( intptr_t );
+}
+
+/*
+====================
+idInterpreter::PushVector
+====================
+*/
+ID_INLINE void idInterpreter::PushVector( const idVec3 &vector ) {
+	if ( localstackUsed + E_EVENT_SIZEOF_VEC > LOCALSTACK_SIZE ) {
+		Error( "Push: locals stack overflow\n" );
+	}
+	memset( &localstack[ localstackUsed ], 0, E_EVENT_SIZEOF_VEC );
+	*( idVec3 * )&localstack[ localstackUsed ] = vector;
+	localstackUsed += E_EVENT_SIZEOF_VEC;
 }
 
 /*
