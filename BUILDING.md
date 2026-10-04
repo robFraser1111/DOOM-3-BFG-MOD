@@ -15,7 +15,7 @@ game data is in this repository.
    selects whichever SDK is installed).
 4. Steam copy of Doom 3 BFG Edition, installed and updated.
 
-No separate DirectX SDK, Bink SDK, or Steamworks SDK.
+No separate DirectX SDK, Bink SDK, Steamworks SDK, MFC, or ATL. The C++ desktop workload and a Windows 10/11 SDK are enough.
 
 ## Build in Visual Studio
 
