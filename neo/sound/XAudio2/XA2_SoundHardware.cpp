@@ -30,6 +30,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "../snd_local.h"
 #include "../../../doomclassic/doom/i_sound.h"
 
+// idStr.h defines StrCmp* as macros. shlwapi.h (pulled in by the device headers) defines the same names.
+#undef StrCmpN
+#undef StrCmpNI
+#undef StrCmpI
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <functiondiscoverykeys_devpkey.h>

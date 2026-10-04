@@ -41,10 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 #undef StrCmpN
 #undef StrCmpNI
 #undef StrCmpI
-#include <atlbase.h>
 
-#include <comdef.h>
-#include <comutil.h>
 #include <Wbemidl.h>
 
 #pragma comment (lib, "wbemuuid.lib")
@@ -139,49 +136,65 @@ returns in megabytes
 int Sys_GetVideoRam() {
 	unsigned int retSize = 64;
 
-	CComPtr<IWbemLocator> spLoc = NULL;
-	HRESULT hr = CoCreateInstance( CLSID_WbemLocator, 0, CLSCTX_SERVER, IID_IWbemLocator, ( LPVOID * ) &spLoc );
-	if ( hr != S_OK || spLoc == NULL ) {
+	// Raw COM instead of ATL. The Windows SDK WMI headers are enough, and
+	// VS 2022 does not always install atlbase.h with the C++ workload.
+	IWbemLocator *pLoc = NULL;
+	HRESULT hr = CoCreateInstance( CLSID_WbemLocator, 0, CLSCTX_SERVER, IID_IWbemLocator, ( LPVOID * ) &pLoc );
+	if ( hr != S_OK || pLoc == NULL ) {
 		return retSize;
 	}
 
-	CComBSTR bstrNamespace( _T( "\\\\.\\root\\CIMV2" ) );
-	CComPtr<IWbemServices> spServices;
-
-	// Connect to CIM
-	hr = spLoc->ConnectServer( bstrNamespace, NULL, NULL, 0, NULL, 0, 0, &spServices );
-	if ( hr != WBEM_S_NO_ERROR ) {
+	IWbemServices *pServices = NULL;
+	BSTR bstrNamespace = SysAllocString( L"\\\\.\\root\\CIMV2" );
+	hr = pLoc->ConnectServer( bstrNamespace, NULL, NULL, 0, NULL, 0, 0, &pServices );
+	SysFreeString( bstrNamespace );
+	if ( hr != WBEM_S_NO_ERROR || pServices == NULL ) {
+		pLoc->Release();
 		return retSize;
 	}
 
-	// Switch the security level to IMPERSONATE so that provider will grant access to system-level objects.  
-	hr = CoSetProxyBlanket( spServices, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, NULL, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE );
+	// Switch the security level to IMPERSONATE so that provider will grant access to system-level objects.
+	hr = CoSetProxyBlanket( pServices, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, NULL, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE );
 	if ( hr != S_OK ) {
+		pServices->Release();
+		pLoc->Release();
 		return retSize;
 	}
 
 	// Get the vid controller
-	CComPtr<IEnumWbemClassObject> spEnumInst = NULL;
-	hr = spServices->CreateInstanceEnum( CComBSTR( "Win32_VideoController" ), WBEM_FLAG_SHALLOW, NULL, &spEnumInst ); 
-	if ( hr != WBEM_S_NO_ERROR || spEnumInst == NULL ) {
+	IEnumWbemClassObject *pEnumInst = NULL;
+	BSTR bstrClass = SysAllocString( L"Win32_VideoController" );
+	hr = pServices->CreateInstanceEnum( bstrClass, WBEM_FLAG_SHALLOW, NULL, &pEnumInst );
+	SysFreeString( bstrClass );
+	if ( hr != WBEM_S_NO_ERROR || pEnumInst == NULL ) {
+		pServices->Release();
+		pLoc->Release();
 		return retSize;
 	}
 
 	ULONG uNumOfInstances = 0;
-	CComPtr<IWbemClassObject> spInstance = NULL;
-	hr = spEnumInst->Next( 10000, 1, &spInstance, &uNumOfInstances );
+	IWbemClassObject *pInstance = NULL;
+	hr = pEnumInst->Next( 10000, 1, &pInstance, &uNumOfInstances );
 
-	if ( hr == S_OK && spInstance ) {
+	if ( hr == S_OK && pInstance ) {
 		// Get properties from the object
-		CComVariant varSize;
-		hr = spInstance->Get( CComBSTR( _T( "AdapterRAM" ) ), 0, &varSize, 0, 0 );
+		VARIANT varSize;
+		VariantInit( &varSize );
+		BSTR bstrProp = SysAllocString( L"AdapterRAM" );
+		hr = pInstance->Get( bstrProp, 0, &varSize, 0, 0 );
+		SysFreeString( bstrProp );
 		if ( hr == S_OK ) {
 			retSize = varSize.intVal / ( 1024 * 1024 );
 			if ( retSize == 0 ) {
 				retSize = 64;
 			}
 		}
+		VariantClear( &varSize );
+		pInstance->Release();
 	}
+	pEnumInst->Release();
+	pServices->Release();
+	pLoc->Release();
 	return retSize;
 }
 
