@@ -362,7 +362,7 @@ static void Sys_OpenEarlyLog( const char *cmdLine ) {
 	char path[MAX_PATH];
 
 	Sys_ExeDirectory( dir, sizeof( dir ) );
-	_snprintf( path, sizeof( path ), "%sDoom3BFG.log", dir );
+	(_snprintf)( path, sizeof( path ), "%sDoom3BFG.log", dir );
 	path[sizeof( path ) - 1] = '\0';
 
 	earlyLogFile = fopen( path, "w" );
@@ -1593,15 +1593,15 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 	}
 
 	Sys_ExeDirectory( dir, sizeof( dir ) );
-	_snprintf( crashPath, sizeof( crashPath ), "%scrash.txt", dir );
-	_snprintf( dumpPath, sizeof( dumpPath ), "%scrash.dmp", dir );
+	(_snprintf)( crashPath, sizeof( crashPath ), "%scrash.txt", dir );
+	(_snprintf)( dumpPath, sizeof( dumpPath ), "%scrash.dmp", dir );
 	crashPath[sizeof( crashPath ) - 1] = '\0';
 	dumpPath[sizeof( dumpPath ) - 1] = '\0';
 
 	HANDLE file = CreateFileA( crashPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
 
 	EXCEPTION_RECORD *record = info->ExceptionRecord;
-	_snprintf( line, sizeof( line ), "Unhandled exception 0x%08lx at %p\r\n", record->ExceptionCode, record->ExceptionAddress );
+	(_snprintf)( line, sizeof( line ), "Unhandled exception 0x%08lx at %p\r\n", record->ExceptionCode, record->ExceptionAddress );
 	line[sizeof( line ) - 1] = '\0';
 	Sys_WriteCrashText( file, line );
 
@@ -1616,7 +1616,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 			baseName = slash + 1;
 		}
 		unsigned long long offset = (unsigned long long)( (uintptr_t)record->ExceptionAddress - (uintptr_t)faultModule );
-		_snprintf( line, sizeof( line ), "Faulting module: %s+0x%I64x\r\nFull path: %s\r\n", baseName, offset, modPath );
+		(_snprintf)( line, sizeof( line ), "Faulting module: %s+0x%I64x\r\nFull path: %s\r\n", baseName, offset, modPath );
 		line[sizeof( line ) - 1] = '\0';
 		Sys_WriteCrashText( file, line );
 	}
@@ -1698,7 +1698,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 				frameOffset = (unsigned long long)( frame.AddrPC.Offset - (DWORD64)(uintptr_t)frameMod );
 			}
 
-			_snprintf( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
+			(_snprintf)( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
 			line[sizeof( line ) - 1] = '\0';
 			Sys_WriteCrashText( file, line );
 		}
