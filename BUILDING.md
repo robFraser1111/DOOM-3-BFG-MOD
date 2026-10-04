@@ -97,6 +97,7 @@ Fixed, including the earlier startup and Lost Mission crashes:
 - GUI transition offsets use `offsetof` and stay `int`. A window object is far smaller than 2GB, so the offset fits.
 - The debug map-file symbolizer stores a module base as `uintptr_t`. The x86 prologue walk and the `ID_WIN_X86_ASM` blocks are not compiled for x64.
 - Classic Doom colormaps and translation tables align with `uintptr_t`. The old `(int)` alignment dropped the high half of the allocation. Savegame indexes that lived in pointer fields are read back with `intptr_t`. The cvar "not registered yet" marker is `0xFFFFFFFF` widened through `uintptr_t`, not a real `idCVar*`.
+- OpenGL buffer names are `GLuint`, not `void*`. Vertex, index, and joint buffers store the name directly. CPU speed reads the registry `~MHz` DWORD into a `DWORD` instead of into a pointer variable.
 
 `C4311`, `C4312`, and `C4302` (pointer truncated to 32 bits, or a 32-bit int widened to a pointer) are enabled, and the engine projects treat warnings as errors. `C4244`, `C4267`, `C4477`, and `C4838` stay disabled. Turning those on fails the build on the existing float-to-int, `size_t`-to-int, `printf`, and narrowing conversions. Those sites were read and left alone when they were numeric, not pointer-width bugs.
 
