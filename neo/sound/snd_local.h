@@ -82,12 +82,22 @@ typedef enum {
 
 #define OPERATION_SET 1
 
-#include <dxsdkver.h>
-
+// Windows SDK XAudio2 2.9 (built into Windows 8+). Not the June 2010 DirectX SDK 2.7 headers.
 #include <xaudio2.h>
 #include <xaudio2fx.h>
 #include <X3DAudio.h>
-#include <xma2defs.h>
+
+// 2.7 names that 2.9 dropped. Music-voice is only a scheduling hint; XMA is Xbox-only.
+#ifndef XAUDIO2_VOICE_MUSIC
+#define XAUDIO2_VOICE_MUSIC 0
+#endif
+#ifndef XAUDIO2_MAX_RATIO_TIMES_RATE_XMA_MONO
+#define XAUDIO2_MAX_RATIO_TIMES_RATE_XMA_MONO 600000
+#endif
+#ifndef XAUDIO2_MAX_RATIO_TIMES_RATE_XMA_MULTICHANNEL
+#define XAUDIO2_MAX_RATIO_TIMES_RATE_XMA_MULTICHANNEL 300000
+#endif
+
 #include "XAudio2/XA2_SoundSample.h"
 #include "XAudio2/XA2_SoundVoice.h"
 #include "XAudio2/XA2_SoundHardware.h"

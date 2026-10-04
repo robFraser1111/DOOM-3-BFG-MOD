@@ -182,9 +182,9 @@ bulk of the codebase, so it is the best place for analyze pragmas.
 #pragma warning( disable: 6540 )	// warning C6540: The use of attribute annotations on this function will invalidate all of its existing __declspec annotations [D:\tech5\engine\engine-10.vcxproj]
 
 
-// checking format strings catches a LOT of errors
-#include <CodeAnalysis\SourceAnnotations.h>
-#define	VERIFY_FORMAT_STRING	[SA_FormatString(Style="printf")]
+// The VS2010 source-annotation header (CodeAnalysis/SourceAnnotations.h) is not
+// in current Windows SDKs. Keep the macro so the printf-style declarations stay put.
+#define	VERIFY_FORMAT_STRING
 
 
 // We need to inform the compiler that Error() and FatalError() will

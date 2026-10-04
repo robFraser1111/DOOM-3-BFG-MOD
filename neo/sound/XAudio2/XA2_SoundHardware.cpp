@@ -30,6 +30,99 @@ If you have questions concerning this license or the applicable additional terms
 #include "../snd_local.h"
 #include "../../../doomclassic/doom/i_sound.h"
 
+#include <mmdeviceapi.h>
+#include <audioclient.h>
+#include <functiondiscoverykeys_devpkey.h>
+#include <propvarutil.h>
+
+/*
+========================
+xa2AudioDevice_t
+
+Active render endpoints from WASAPI. XAudio2 2.9 no longer exposes
+IXAudio2::GetDeviceCount / GetDeviceDetails (those were XAudio2 2.7).
+========================
+*/
+struct xa2AudioDevice_t {
+	WCHAR	id[512];
+	char	name[256];
+	UINT32	channels;
+	UINT32	sampleRate;
+	DWORD	channelMask;
+};
+
+static void EnumerateRenderDevices( idList<xa2AudioDevice_t> &devices ) {
+	devices.Clear();
+
+	IMMDeviceEnumerator *enumerator = NULL;
+	HRESULT hr = CoCreateInstance( __uuidof( MMDeviceEnumerator ), NULL, CLSCTX_ALL, __uuidof( IMMDeviceEnumerator ), (void **)&enumerator );
+	if ( FAILED( hr ) || enumerator == NULL ) {
+		return;
+	}
+
+	IMMDeviceCollection *collection = NULL;
+	hr = enumerator->EnumAudioEndpoints( eRender, DEVICE_STATE_ACTIVE, &collection );
+	if ( FAILED( hr ) || collection == NULL ) {
+		enumerator->Release();
+		return;
+	}
+
+	UINT count = 0;
+	collection->GetCount( &count );
+	for ( UINT index = 0; index < count; index++ ) {
+		IMMDevice *device = NULL;
+		if ( FAILED( collection->Item( index, &device ) ) || device == NULL ) {
+			continue;
+		}
+
+		xa2AudioDevice_t info;
+		memset( &info, 0, sizeof( info ) );
+		info.channels = 2;
+		info.sampleRate = 44100;
+		info.channelMask = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
+
+		LPWSTR endpointId = NULL;
+		if ( SUCCEEDED( device->GetId( &endpointId ) ) && endpointId != NULL ) {
+			wcsncpy( info.id, endpointId, ( sizeof( info.id ) / sizeof( info.id[0] ) ) - 1 );
+			CoTaskMemFree( endpointId );
+		}
+
+		IPropertyStore *store = NULL;
+		if ( SUCCEEDED( device->OpenPropertyStore( STGM_READ, &store ) ) && store != NULL ) {
+			PROPVARIANT friendly;
+			PropVariantInit( &friendly );
+			if ( SUCCEEDED( store->GetValue( PKEY_Device_FriendlyName, &friendly ) ) && friendly.vt == VT_LPWSTR && friendly.pwszVal != NULL ) {
+				wcstombs( info.name, friendly.pwszVal, sizeof( info.name ) - 1 );
+			}
+			PropVariantClear( &friendly );
+			store->Release();
+		}
+		if ( info.name[0] == '\0' ) {
+			idStr::Copynz( info.name, "Audio Device", sizeof( info.name ) );
+		}
+
+		IAudioClient *client = NULL;
+		if ( SUCCEEDED( device->Activate( __uuidof( IAudioClient ), CLSCTX_ALL, NULL, (void **)&client ) ) && client != NULL ) {
+			WAVEFORMATEX *mix = NULL;
+			if ( SUCCEEDED( client->GetMixFormat( &mix ) ) && mix != NULL ) {
+				info.channels = mix->nChannels;
+				info.sampleRate = mix->nSamplesPerSec;
+				if ( mix->wFormatTag == WAVE_FORMAT_EXTENSIBLE ) {
+					info.channelMask = reinterpret_cast<WAVEFORMATEXTENSIBLE *>( mix )->dwChannelMask;
+				}
+				CoTaskMemFree( mix );
+			}
+			client->Release();
+		}
+
+		devices.Append( info );
+		device->Release();
+	}
+
+	collection->Release();
+	enumerator->Release();
+}
+
 idCVar s_showLevelMeter( "s_showLevelMeter", "0", CVAR_BOOL|CVAR_ARCHIVE, "Show VU meter" );
 idCVar s_meterTopTime( "s_meterTopTime", "1000", CVAR_INTEGER|CVAR_ARCHIVE, "How long (in milliseconds) peaks are displayed on the VU meter" );
 idCVar s_meterPosition( "s_meterPosition", "100 100 20 200", CVAR_ARCHIVE, "VU meter location (x y w h)" );
@@ -61,102 +154,18 @@ idSoundHardware_XAudio2::idSoundHardware_XAudio2() {
 }
 
 void listDevices_f( const idCmdArgs & args ) {
-
-	IXAudio2 * pXAudio2 = soundSystemLocal.hardware.GetIXAudio2();
-
-	if ( pXAudio2 == NULL ) {
-		idLib::Warning( "No xaudio object" );
-		return;
-	}
-
-	UINT32 deviceCount = 0;
-	if ( pXAudio2->GetDeviceCount( &deviceCount ) != S_OK || deviceCount == 0 ) {
+	idList<xa2AudioDevice_t> devices;
+	EnumerateRenderDevices( devices );
+	if ( devices.Num() == 0 ) {
 		idLib::Warning( "No audio devices found" );
 		return;
 	}
 
-	for ( unsigned int i = 0; i < deviceCount; i++ ) {
-		XAUDIO2_DEVICE_DETAILS deviceDetails;
-		if ( pXAudio2->GetDeviceDetails( i, &deviceDetails ) != S_OK ) {
-			continue;
-		}
-		idStaticList< const char *, 5 > roles;
-		if ( deviceDetails.Role & DefaultConsoleDevice ) {
-			roles.Append( "Console Device" );
-		}
-		if ( deviceDetails.Role & DefaultMultimediaDevice ) {
-			roles.Append( "Multimedia Device" );
-		}
-		if ( deviceDetails.Role & DefaultCommunicationsDevice ) {
-			roles.Append( "Communications Device" );
-		}
-		if ( deviceDetails.Role & DefaultGameDevice ) {
-			roles.Append( "Game Device" );
-		}
-		idStaticList< const char *, 11 > channelNames;
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_FRONT_LEFT ) {
-			channelNames.Append( "Front Left" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_FRONT_RIGHT ) {
-			channelNames.Append( "Front Right" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_FRONT_CENTER ) {
-			channelNames.Append( "Front Center" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_LOW_FREQUENCY ) {
-			channelNames.Append( "Low Frequency" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_BACK_LEFT ) {
-			channelNames.Append( "Back Left" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_BACK_RIGHT ) {
-			channelNames.Append( "Back Right" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_FRONT_LEFT_OF_CENTER ) {
-			channelNames.Append( "Front Left of Center" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_FRONT_RIGHT_OF_CENTER ) {
-			channelNames.Append( "Front Right of Center" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_BACK_CENTER ) {
-			channelNames.Append( "Back Center" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_SIDE_LEFT ) {
-			channelNames.Append( "Side Left" );
-		}
-		if ( deviceDetails.OutputFormat.dwChannelMask & SPEAKER_SIDE_RIGHT ) {
-			channelNames.Append( "Side Right" );
-		}
-		char mbcsDisplayName[ 256 ];
-		wcstombs( mbcsDisplayName, deviceDetails.DisplayName, sizeof( mbcsDisplayName ) );
-		idLib::Printf( "%3d: %s\n", i, mbcsDisplayName );
-		idLib::Printf( "     %d channels, %d Hz\n", deviceDetails.OutputFormat.Format.nChannels, deviceDetails.OutputFormat.Format.nSamplesPerSec );
-		if ( channelNames.Num() != deviceDetails.OutputFormat.Format.nChannels ) {
-			idLib::Printf( S_COLOR_YELLOW "WARNING: " S_COLOR_RED "Mismatch between # of channels and channel mask\n" );
-		}
-		if ( channelNames.Num() == 1 ) {
-			idLib::Printf( "     %s\n", channelNames[0] );
-		} else if ( channelNames.Num() == 2 ) {
-			idLib::Printf( "     %s and %s\n", channelNames[0], channelNames[1] );
-		} else if ( channelNames.Num() > 2 ) {
-			idLib::Printf( "     %s", channelNames[0] );
-			for ( int i = 1; i < channelNames.Num() - 1; i++ ) {
-				idLib::Printf( ", %s", channelNames[i] );
-			}
-			idLib::Printf( ", and %s\n", channelNames[channelNames.Num() - 1] );
-		}
-		if ( roles.Num() == 1 ) {
-			idLib::Printf( "     Default %s\n", roles[0] );
-		} else if ( roles.Num() == 2 ) {
-			idLib::Printf( "     Default %s and %s\n", roles[0], roles[1] );
-		} else if ( roles.Num() > 2 ) {
-			idLib::Printf( "     Default %s", roles[0] );
-			for ( int i = 1; i < roles.Num() - 1; i++ ) {
-				idLib::Printf( ", %s", roles[i] );
-			}
-			idLib::Printf( ", and %s\n", roles[roles.Num() - 1] );
-		}
+	for ( int i = 0; i < devices.Num(); i++ ) {
+		idLib::Printf( "%3d: %s\n", i, devices[i].name );
+		idLib::Printf( "     %d channels, %d Hz, mask 0x%x\n", devices[i].channels, devices[i].sampleRate, devices[i].channelMask );
 	}
+	idLib::Printf( "Use s_device N to select one, or -1 for the Windows default.\n" );
 }
 
 /*
@@ -168,25 +177,10 @@ void idSoundHardware_XAudio2::Init() {
 
 	cmdSystem->AddCommand( "listDevices", listDevices_f, 0, "Lists the connected sound devices", NULL );
 
-	DWORD xAudioCreateFlags = 0;
-#ifdef _DEBUG
-	xAudioCreateFlags |= XAUDIO2_DEBUG_ENGINE;
-#endif
-
-	XAUDIO2_PROCESSOR xAudioProcessor = XAUDIO2_DEFAULT_PROCESSOR;
-
-	if ( FAILED( XAudio2Create( &pXAudio2, xAudioCreateFlags, xAudioProcessor ) ) ) {
-		if ( xAudioCreateFlags & XAUDIO2_DEBUG_ENGINE ) {
-			// in case the debug engine isn't installed
-			xAudioCreateFlags &= ~XAUDIO2_DEBUG_ENGINE;
-			if ( FAILED( XAudio2Create( &pXAudio2, xAudioCreateFlags, xAudioProcessor ) ) ) {		
-				idLib::FatalError( "Failed to create XAudio2 engine.  Try installing the latest DirectX." );
-				return;
-			}
-		} else {
-			idLib::FatalError( "Failed to create XAudio2 engine.  Try installing the latest DirectX." );
-			return;
-		}
+	// XAudio2 2.9 has no XAUDIO2_DEBUG_ENGINE flag. Debug tracing is SetDebugConfiguration.
+	if ( FAILED( XAudio2Create( &pXAudio2, 0, XAUDIO2_DEFAULT_PROCESSOR ) ) ) {
+		idLib::FatalError( "Failed to create XAudio2 engine. XAudio2 2.9 is part of Windows 8 and later." );
+		return;
 	}
 #ifdef _DEBUG
 	XAUDIO2_DEBUG_CONFIGURATION debugConfiguration = { 0 };
@@ -199,64 +193,49 @@ void idSoundHardware_XAudio2::Init() {
 	pXAudio2->RegisterForCallbacks( &soundEngineCallback );
 	soundEngineCallback.hardware = this;
 
-	UINT32 deviceCount = 0;
-	if ( pXAudio2->GetDeviceCount( &deviceCount ) != S_OK || deviceCount == 0 ) {
-		idLib::Warning( "No audio devices found" );
-		pXAudio2->Release();
-		pXAudio2 = NULL;
-		return;
-	}
+	idList<xa2AudioDevice_t> devices;
+	EnumerateRenderDevices( devices );
 
 	idCmdArgs args;
 	listDevices_f( args );
 
 	int preferredDevice = s_device.GetInteger();
-	if ( preferredDevice < 0 || preferredDevice >= (int)deviceCount ) {
-		int preferredChannels = 0;
-		for ( unsigned int i = 0; i < deviceCount; i++ ) {
-			XAUDIO2_DEVICE_DETAILS deviceDetails;
-			if ( pXAudio2->GetDeviceDetails( i, &deviceDetails ) != S_OK ) {
-				continue;
-			}
+	const WCHAR *deviceId = NULL;
+	if ( preferredDevice >= 0 && preferredDevice < devices.Num() && devices[preferredDevice].id[0] != L'\0' ) {
+		deviceId = devices[preferredDevice].id;
+		idLib::Printf( "Using device %d (%s)\n", preferredDevice, devices[preferredDevice].name );
+	} else {
+		preferredDevice = -1;
+		idLib::Printf( "Using default audio device\n" );
+	}
 
-			if ( deviceDetails.Role & DefaultGameDevice ) {
-				// if we find a device the user marked as their preferred 'game' device, then always use that
-				preferredDevice = i;
-				preferredChannels = deviceDetails.OutputFormat.Format.nChannels;
-				break;
-			}
-
-			if ( deviceDetails.OutputFormat.Format.nChannels > preferredChannels ) {
-				preferredDevice = i;
-				preferredChannels = deviceDetails.OutputFormat.Format.nChannels;
-			}
+	// Keep the original 44.1 kHz mastering rate. XAudio2 2.9 takes a WASAPI endpoint id, not a device index.
+	DWORD outputSampleRate = 44100;
+	if ( FAILED( pXAudio2->CreateMasteringVoice( &pMasterVoice, XAUDIO2_DEFAULT_CHANNELS, outputSampleRate, 0, deviceId, NULL ) ) ) {
+		if ( deviceId != NULL && SUCCEEDED( pXAudio2->CreateMasteringVoice( &pMasterVoice, XAUDIO2_DEFAULT_CHANNELS, outputSampleRate, 0, NULL, NULL ) ) ) {
+			idLib::Warning( "Failed to open the selected audio device; using the default" );
+			preferredDevice = -1;
+		} else {
+			idLib::Warning( "Failed to create master voice" );
+			pXAudio2->Release();
+			pXAudio2 = NULL;
+			return;
 		}
-	}
-
-	idLib::Printf( "Using device %d\n", preferredDevice );
-
-	XAUDIO2_DEVICE_DETAILS deviceDetails;
-	if ( pXAudio2->GetDeviceDetails( preferredDevice, &deviceDetails ) != S_OK ) {
-		// One way this could happen is if a device is removed between the loop and this line of code
-		// Highly unlikely but possible
-		idLib::Warning( "Failed to get device details" );
-		pXAudio2->Release();
-		pXAudio2 = NULL;
-		return;
-	}
-
-	DWORD outputSampleRate = 44100; // Max( (DWORD)XAUDIO2FX_REVERB_MIN_FRAMERATE, Min( (DWORD)XAUDIO2FX_REVERB_MAX_FRAMERATE, deviceDetails.OutputFormat.Format.nSamplesPerSec ) );
-
-	if ( FAILED( pXAudio2->CreateMasteringVoice( &pMasterVoice, XAUDIO2_DEFAULT_CHANNELS, outputSampleRate, 0, preferredDevice, NULL ) ) ) {
-		idLib::Warning( "Failed to create master voice" );
-		pXAudio2->Release();
-		pXAudio2 = NULL;
-		return;
 	}
 	pMasterVoice->SetVolume( DBtoLinear( s_volume_dB.GetFloat() ) );
 
-	outputChannels = deviceDetails.OutputFormat.Format.nChannels;
-	channelMask = deviceDetails.OutputFormat.dwChannelMask;
+	DWORD masteredMask = 0;
+	pMasterVoice->GetChannelMask( &masteredMask );
+	XAUDIO2_VOICE_DETAILS voiceDetails;
+	pMasterVoice->GetVoiceDetails( &voiceDetails );
+	outputChannels = (int)voiceDetails.InputChannels;
+	channelMask = masteredMask;
+	if ( outputChannels <= 0 ) {
+		outputChannels = ( preferredDevice >= 0 ) ? (int)devices[preferredDevice].channels : 2;
+	}
+	if ( channelMask == 0 ) {
+		channelMask = ( preferredDevice >= 0 ) ? devices[preferredDevice].channelMask : ( SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT );
+	}
 
 	idSoundVoice::InitSurround( outputChannels, channelMask );
 

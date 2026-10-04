@@ -390,7 +390,8 @@ struct sysMemoryStats_t {
 	int availExtendedVirtual;
 };
 
-typedef unsigned long address_t;
+// Pointer-sized. unsigned long is 32-bit on Windows x64, which truncates return addresses.
+typedef uintptr_t address_t;
 
 void			Sys_Init();
 void			Sys_Shutdown();

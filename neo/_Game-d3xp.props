@@ -15,7 +15,8 @@
       <ModuleDefinitionFile>.\d3xp\game.def</ModuleDefinitionFile>
     </Link>
     <PreBuildEvent>
-      <Command>..\build\Win32\"$(Configuration)"\TypeInfo.exe</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
 </Project>

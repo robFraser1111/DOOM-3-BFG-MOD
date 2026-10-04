@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!--
+    Applied to every vcxproj under this tree.
+    VS 2022's v143 toolset and the Windows 10/11 SDK replace the VS2010 toolset
+    and the June 2010 DirectX SDK. WindowsTargetPlatformVersion 10.0 means
+    "newest installed Windows 10 SDK".
+  -->
+  <PropertyGroup>
+    <PlatformToolset>v143</PlatformToolset>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+</Project>

@@ -489,7 +489,7 @@ void Sym_Shutdown() {
 Sym_GetFuncInfo
 ==================
 */
-void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
+void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	MEMORY_BASIC_INFORMATION mbi;
 	module_t *m;
 	symbol_t *s;
@@ -526,7 +526,7 @@ void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
 		}
 	}
 
-	sprintf( funcName, "0x%08x", addr );
+	sprintf( funcName, "0x%p", (void *)addr );
 	module = "";
 }
 
@@ -586,7 +586,7 @@ void Sym_Shutdown() {
 Sym_GetFuncInfo
 ==================
 */
-void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
+void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	MEMORY_BASIC_INFORMATION mbi;
 
 	VirtualQuery( (void*)addr, &mbi, sizeof(mbi) );
@@ -627,7 +627,7 @@ void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
 		LocalFree( lpMsgBuf );
 
 		// Couldn't retrieve symbol (no debug info?, can't load dbghelp.dll?)
-		sprintf( funcName, "0x%08x", addr );
+		sprintf( funcName, "0x%p", (void *)addr );
 		module = "";
     }
 }
@@ -655,9 +655,9 @@ void Sym_Shutdown() {
 Sym_GetFuncInfo
 ==================
 */
-void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
+void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	module = "";
-	sprintf( funcName, "0x%08x", addr );
+	sprintf( funcName, "0x%p", (void *)addr );
 }
 
 #endif
@@ -685,7 +685,11 @@ address_t GetFuncAddr( address_t midPtPtr ) {
 GetCallerAddr
 ==================
 */
-address_t GetCallerAddr( long _ebp ) {
+address_t GetCallerAddr( intptr_t _ebp ) {
+#if defined( _M_X64 )
+	(void)_ebp;
+	return 0;
+#else
 	long midPtPtr;
 	long res = 0;
 
@@ -702,6 +706,7 @@ address_t GetCallerAddr( long _ebp ) {
 	res = GetFuncAddr( midPtPtr );
 label:
 	return res;
+#endif
 }
 
 /*
@@ -712,6 +717,10 @@ Sys_GetCallStack
 ==================
 */
 void Sys_GetCallStack( address_t *callStack, const int callStackSize ) {
+#if defined( _M_X64 )
+	USHORT frames = RtlCaptureStackBackTrace( 0, (ULONG)callStackSize, (PVOID *)callStack, NULL );
+	int i = (int)frames;
+#else
 #if 1 //def _DEBUG
 	int i;
 	long m_ebp;
@@ -733,6 +742,7 @@ void Sys_GetCallStack( address_t *callStack, const int callStackSize ) {
 	}
 #else
 	int i = 0;
+#endif
 #endif
 	while( i < callStackSize ) {
 		callStack[i++] = 0;
@@ -785,7 +795,7 @@ const char *Sys_GetCallStackCurAddressStr( int depth ) {
 
 	index = 0;
 	for ( i = depth-1; i >= 0; i-- ) {
-		index += sprintf( string+index, " -> 0x%08x", callStack[i] );
+		index += sprintf( string+index, " -> 0x%p", (void *)callStack[i] );
 	}
 	return string;
 }

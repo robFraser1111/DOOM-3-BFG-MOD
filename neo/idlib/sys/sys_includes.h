@@ -44,7 +44,14 @@ If you have questions concerning this license or the applicable additional terms
 #ifndef _D3SDK
 #ifndef GAME_DLL
 
-#define WINVER				0x501
+// XAudio2 2.9 from the Windows SDK requires Windows 8 or later.
+// Windows 10/11 satisfy this. The June 2010 DirectX SDK is not used.
+#ifndef WINVER
+#define WINVER				0x0602
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT		0x0602
+#endif
 
 #include <winsock2.h>
 #include <mmsystem.h>

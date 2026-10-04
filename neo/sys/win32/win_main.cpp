@@ -1264,8 +1264,10 @@ void Win_Frame() {
 	}
 }
 
+#if !defined( _M_X64 )
 extern "C" { void _chkstk( int size ); };
 void clrstk();
+#endif
 
 /*
 ====================
@@ -1283,6 +1285,7 @@ void TestChkStk() {
 HackChkStk
 ====================
 */
+#if !defined( _M_X64 )
 void HackChkStk() {
 	DWORD	old;
 	VirtualProtect( _chkstk, 6, PAGE_EXECUTE_READWRITE, &old );
@@ -1291,6 +1294,7 @@ void HackChkStk() {
 
 	TestChkStk();
 }
+#endif
 
 /*
 ====================
@@ -1384,6 +1388,59 @@ EXCEPTION_DISPOSITION __cdecl _except_handler( struct _EXCEPTION_RECORD *Excepti
 	static char msg[ 8192 ];
 	char FPUFlags[2048];
 
+#if defined( _M_X64 )
+	Sys_FPU_PrintStateFlags( FPUFlags, ContextRecord->FltSave.ControlWord,
+										ContextRecord->FltSave.StatusWord,
+										ContextRecord->FltSave.TagWord,
+										ContextRecord->FltSave.ErrorOffset,
+										ContextRecord->FltSave.ErrorSelector,
+										ContextRecord->FltSave.DataOffset,
+										ContextRecord->FltSave.DataSelector );
+
+	sprintf( msg,
+		"Please describe what you were doing when DOOM 3 crashed!\n"
+		"If this text did not pop into your email client please copy and email it to programmers@idsoftware.com\n"
+			"\n"
+			"-= FATAL EXCEPTION =-\n"
+			"\n"
+			"%s\n"
+			"\n"
+			"0x%x at address 0x%p\n"
+			"\n"
+			"%s\n"
+			"\n"
+			"RAX = 0x%016llx RBX = 0x%016llx\n"
+			"RCX = 0x%016llx RDX = 0x%016llx\n"
+			"RSI = 0x%016llx RDI = 0x%016llx\n"
+			"RIP = 0x%016llx RSP = 0x%016llx\n"
+			"RBP = 0x%016llx EFL = 0x%08x\n"
+			"\n"
+			"CS = 0x%04x\n"
+			"SS = 0x%04x\n"
+			"DS = 0x%04x\n"
+			"ES = 0x%04x\n"
+			"FS = 0x%04x\n"
+			"GS = 0x%04x\n"
+			"\n"
+			"%s\n",
+			com_version.GetString(),
+			ExceptionRecord->ExceptionCode,
+			ExceptionRecord->ExceptionAddress,
+			GetExceptionCodeInfo( ExceptionRecord->ExceptionCode ),
+			ContextRecord->Rax, ContextRecord->Rbx,
+			ContextRecord->Rcx, ContextRecord->Rdx,
+			ContextRecord->Rsi, ContextRecord->Rdi,
+			ContextRecord->Rip, ContextRecord->Rsp,
+			ContextRecord->Rbp, ContextRecord->EFlags,
+			ContextRecord->SegCs,
+			ContextRecord->SegSs,
+			ContextRecord->SegDs,
+			ContextRecord->SegEs,
+			ContextRecord->SegFs,
+			ContextRecord->SegGs,
+			FPUFlags
+		);
+#else
 	Sys_FPU_PrintStateFlags( FPUFlags, ContextRecord->FloatSave.ControlWord,
 										ContextRecord->FloatSave.StatusWord,
 										ContextRecord->FloatSave.TagWord,
@@ -1436,6 +1493,7 @@ EXCEPTION_DISPOSITION __cdecl _except_handler( struct _EXCEPTION_RECORD *Excepti
 			ContextRecord->SegGs,
 			FPUFlags
 		);
+#endif
 
 	EmailCrashReport( msg );
 	common->FatalError( msg );
@@ -1556,6 +1614,7 @@ clrstk
 I tried to get the run time to call this at every function entry, but
 ====================
 */
+#if !defined( _M_X64 )
 static int	parmBytes;
 __declspec( naked ) void clrstk() {
 	// eax = bytes to add to stack
@@ -1584,6 +1643,7 @@ __declspec( naked ) void clrstk() {
         ret
 	}
 }
+#endif
 
 /*
 ==================
