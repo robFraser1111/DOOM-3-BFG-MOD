@@ -41,10 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 #undef StrCmpN
 #undef StrCmpNI
 #undef StrCmpI
-#include <atlbase.h>
 
-#include <comdef.h>
-#include <comutil.h>
 #include <Wbemidl.h>
 
 #pragma comment (lib, "wbemuuid.lib")
@@ -139,49 +136,65 @@ returns in megabytes
 int Sys_GetVideoRam() {
 	unsigned int retSize = 64;
 
-	CComPtr<IWbemLocator> spLoc = NULL;
-	HRESULT hr = CoCreateInstance( CLSID_WbemLocator, 0, CLSCTX_SERVER, IID_IWbemLocator, ( LPVOID * ) &spLoc );
-	if ( hr != S_OK || spLoc == NULL ) {
+	// Raw COM instead of ATL. The Windows SDK WMI headers are enough, and
+	// VS 2022 does not always install atlbase.h with the C++ workload.
+	IWbemLocator *pLoc = NULL;
+	HRESULT hr = CoCreateInstance( CLSID_WbemLocator, 0, CLSCTX_SERVER, IID_IWbemLocator, ( LPVOID * ) &pLoc );
+	if ( hr != S_OK || pLoc == NULL ) {
 		return retSize;
 	}
 
-	CComBSTR bstrNamespace( _T( "\\\\.\\root\\CIMV2" ) );
-	CComPtr<IWbemServices> spServices;
-
-	// Connect to CIM
-	hr = spLoc->ConnectServer( bstrNamespace, NULL, NULL, 0, NULL, 0, 0, &spServices );
-	if ( hr != WBEM_S_NO_ERROR ) {
+	IWbemServices *pServices = NULL;
+	BSTR bstrNamespace = SysAllocString( L"\\\\.\\root\\CIMV2" );
+	hr = pLoc->ConnectServer( bstrNamespace, NULL, NULL, 0, NULL, 0, 0, &pServices );
+	SysFreeString( bstrNamespace );
+	if ( hr != WBEM_S_NO_ERROR || pServices == NULL ) {
+		pLoc->Release();
 		return retSize;
 	}
 
-	// Switch the security level to IMPERSONATE so that provider will grant access to system-level objects.  
-	hr = CoSetProxyBlanket( spServices, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, NULL, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE );
+	// Switch the security level to IMPERSONATE so that provider will grant access to system-level objects.
+	hr = CoSetProxyBlanket( pServices, RPC_C_AUTHN_WINNT, RPC_C_AUTHZ_NONE, NULL, RPC_C_AUTHN_LEVEL_CALL, RPC_C_IMP_LEVEL_IMPERSONATE, NULL, EOAC_NONE );
 	if ( hr != S_OK ) {
+		pServices->Release();
+		pLoc->Release();
 		return retSize;
 	}
 
 	// Get the vid controller
-	CComPtr<IEnumWbemClassObject> spEnumInst = NULL;
-	hr = spServices->CreateInstanceEnum( CComBSTR( "Win32_VideoController" ), WBEM_FLAG_SHALLOW, NULL, &spEnumInst ); 
-	if ( hr != WBEM_S_NO_ERROR || spEnumInst == NULL ) {
+	IEnumWbemClassObject *pEnumInst = NULL;
+	BSTR bstrClass = SysAllocString( L"Win32_VideoController" );
+	hr = pServices->CreateInstanceEnum( bstrClass, WBEM_FLAG_SHALLOW, NULL, &pEnumInst );
+	SysFreeString( bstrClass );
+	if ( hr != WBEM_S_NO_ERROR || pEnumInst == NULL ) {
+		pServices->Release();
+		pLoc->Release();
 		return retSize;
 	}
 
 	ULONG uNumOfInstances = 0;
-	CComPtr<IWbemClassObject> spInstance = NULL;
-	hr = spEnumInst->Next( 10000, 1, &spInstance, &uNumOfInstances );
+	IWbemClassObject *pInstance = NULL;
+	hr = pEnumInst->Next( 10000, 1, &pInstance, &uNumOfInstances );
 
-	if ( hr == S_OK && spInstance ) {
+	if ( hr == S_OK && pInstance ) {
 		// Get properties from the object
-		CComVariant varSize;
-		hr = spInstance->Get( CComBSTR( _T( "AdapterRAM" ) ), 0, &varSize, 0, 0 );
+		VARIANT varSize;
+		VariantInit( &varSize );
+		BSTR bstrProp = SysAllocString( L"AdapterRAM" );
+		hr = pInstance->Get( bstrProp, 0, &varSize, 0, 0 );
+		SysFreeString( bstrProp );
 		if ( hr == S_OK ) {
 			retSize = varSize.intVal / ( 1024 * 1024 );
 			if ( retSize == 0 ) {
 				retSize = 64;
 			}
 		}
+		VariantClear( &varSize );
+		pInstance->Release();
 	}
+	pEnumInst->Release();
+	pServices->Release();
+	pLoc->Release();
 	return retSize;
 }
 
@@ -304,7 +317,7 @@ typedef struct symbol_s {
 } symbol_t;
 
 typedef struct module_s {
-	int					address;
+	uintptr_t			address;
 	char *				name;
 	symbol_t *			symbols;
 	struct module_s *	next;
@@ -361,7 +374,7 @@ int ParseHexNumber( const char **ptr ) {
 Sym_Init
 ==================
 */
-void Sym_Init( long addr ) {
+void Sym_Init( address_t addr ) {
 	TCHAR moduleName[MAX_STRING_CHARS];
 	MEMORY_BASIC_INFORMATION mbi;
 
@@ -382,7 +395,7 @@ void Sym_Init( long addr ) {
 	module_t *module = (module_t *) malloc( sizeof( module_t ) );
 	module->name = (char *) malloc( strlen( moduleName ) + 1 );
 	strcpy( module->name, moduleName );
-	module->address = (int)mbi.AllocationBase;
+	module->address = (uintptr_t)mbi.AllocationBase;
 	module->symbols = NULL;
 	module->next = modules;
 	modules = module;
@@ -489,7 +502,7 @@ void Sym_Shutdown() {
 Sym_GetFuncInfo
 ==================
 */
-void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
+void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	MEMORY_BASIC_INFORMATION mbi;
 	module_t *m;
 	symbol_t *s;
@@ -497,7 +510,7 @@ void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
 	VirtualQuery( (void*)addr, &mbi, sizeof(mbi) );
 
 	for ( m = modules; m != NULL; m = m->next ) {
-		if ( m->address == (int) mbi.AllocationBase ) {
+		if ( m->address == (uintptr_t)mbi.AllocationBase ) {
 			break;
 		}
 	}
@@ -526,7 +539,7 @@ void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
 		}
 	}
 
-	sprintf( funcName, "0x%08x", addr );
+	sprintf( funcName, "0x%p", (void *)addr );
 	module = "";
 }
 
@@ -586,7 +599,7 @@ void Sym_Shutdown() {
 Sym_GetFuncInfo
 ==================
 */
-void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
+void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	MEMORY_BASIC_INFORMATION mbi;
 
 	VirtualQuery( (void*)addr, &mbi, sizeof(mbi) );
@@ -627,7 +640,7 @@ void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
 		LocalFree( lpMsgBuf );
 
 		// Couldn't retrieve symbol (no debug info?, can't load dbghelp.dll?)
-		sprintf( funcName, "0x%08x", addr );
+		sprintf( funcName, "0x%p", (void *)addr );
 		module = "";
     }
 }
@@ -655,9 +668,9 @@ void Sym_Shutdown() {
 Sym_GetFuncInfo
 ==================
 */
-void Sym_GetFuncInfo( long addr, idStr &module, idStr &funcName ) {
+void Sym_GetFuncInfo( address_t addr, idStr &module, idStr &funcName ) {
 	module = "";
-	sprintf( funcName, "0x%08x", addr );
+	sprintf( funcName, "0x%p", (void *)addr );
 }
 
 #endif
@@ -668,6 +681,12 @@ GetFuncAddr
 ==================
 */
 address_t GetFuncAddr( address_t midPtPtr ) {
+#if defined( _M_X64 )
+	// The scan below looks for the x86 frame prologue (push ebp / mov ebp, esp).
+	// x64 frames do not use it, and walking backward from a return address is unsafe.
+	(void)midPtPtr;
+	return 0;
+#else
 	long temp;
 	do {
 		temp = (long)(*(long*)midPtPtr);
@@ -678,6 +697,7 @@ address_t GetFuncAddr( address_t midPtPtr ) {
 	} while(true);
 
 	return midPtPtr;
+#endif
 }
 
 /*
@@ -685,7 +705,11 @@ address_t GetFuncAddr( address_t midPtPtr ) {
 GetCallerAddr
 ==================
 */
-address_t GetCallerAddr( long _ebp ) {
+address_t GetCallerAddr( intptr_t _ebp ) {
+#if defined( _M_X64 )
+	(void)_ebp;
+	return 0;
+#else
 	long midPtPtr;
 	long res = 0;
 
@@ -702,6 +726,7 @@ address_t GetCallerAddr( long _ebp ) {
 	res = GetFuncAddr( midPtPtr );
 label:
 	return res;
+#endif
 }
 
 /*
@@ -712,6 +737,10 @@ Sys_GetCallStack
 ==================
 */
 void Sys_GetCallStack( address_t *callStack, const int callStackSize ) {
+#if defined( _M_X64 )
+	USHORT frames = RtlCaptureStackBackTrace( 0, (ULONG)callStackSize, (PVOID *)callStack, NULL );
+	int i = (int)frames;
+#else
 #if 1 //def _DEBUG
 	int i;
 	long m_ebp;
@@ -733,6 +762,7 @@ void Sys_GetCallStack( address_t *callStack, const int callStackSize ) {
 	}
 #else
 	int i = 0;
+#endif
 #endif
 	while( i < callStackSize ) {
 		callStack[i++] = 0;
@@ -785,7 +815,7 @@ const char *Sys_GetCallStackCurAddressStr( int depth ) {
 
 	index = 0;
 	for ( i = depth-1; i >= 0; i-- ) {
-		index += sprintf( string+index, " -> 0x%08x", callStack[i] );
+		index += sprintf( string+index, " -> 0x%p", (void *)callStack[i] );
 	}
 	return string;
 }

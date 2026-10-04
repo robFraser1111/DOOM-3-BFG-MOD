@@ -32,12 +32,14 @@ If you have questions concerning this license or the applicable additional terms
 #include <errno.h>
 #include <float.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <direct.h>
 #include <io.h>
 #include <conio.h>
 #include <mapi.h>
 #include <ShellAPI.h>
 #include <Shlobj.h>
+#include <dbghelp.h>
 
 #ifndef __MRC__
 #include <sys/types.h>
@@ -327,6 +329,69 @@ Sys_Printf
 ==============
 */
 #define MAXPRINTMSG 4096
+
+// Console text from startup, flushed on every write so a crash still leaves a log
+// next to the executable. com_logFile is off by default and only opens after the
+// filesystem is up, which is too late for the startup crash.
+static FILE *	earlyLogFile = NULL;
+
+// idStr turns _vsnprintf into an object-like macro. This helper calls the CRT.
+#pragma push_macro( "_vsnprintf" )
+#undef _vsnprintf
+static int Sys_Format( char *dest, size_t destSize, const char *fmt, ... ) {
+	va_list ap;
+	int n;
+
+	if ( dest == NULL || destSize == 0 ) {
+		return -1;
+	}
+	va_start( ap, fmt );
+	n = _vsnprintf( dest, destSize, fmt, ap );
+	va_end( ap );
+	dest[destSize - 1] = '\0';
+	return n;
+}
+#pragma pop_macro( "_vsnprintf" )
+
+static void Sys_ExeDirectory( char *out, size_t outSize ) {
+	DWORD n = GetModuleFileNameA( NULL, out, (DWORD)outSize );
+	if ( n == 0 || n >= outSize ) {
+		if ( outSize > 0 ) {
+			out[0] = '\0';
+		}
+		return;
+	}
+	char *slash = strrchr( out, '\\' );
+	if ( slash != NULL ) {
+		slash[1] = '\0';
+	}
+}
+
+static void Sys_EarlyLogWrite( const char *msg ) {
+	if ( earlyLogFile == NULL || msg == NULL ) {
+		return;
+	}
+	fputs( msg, earlyLogFile );
+	fflush( earlyLogFile );
+}
+
+static void Sys_OpenEarlyLog( const char *cmdLine ) {
+	char dir[MAX_PATH];
+	char path[MAX_PATH];
+
+	Sys_ExeDirectory( dir, sizeof( dir ) );
+	Sys_Format( path, sizeof( path ), "%sDoom3BFG.log", dir );
+	path[sizeof( path ) - 1] = '\0';
+
+	earlyLogFile = fopen( path, "w" );
+	if ( earlyLogFile == NULL ) {
+		return;
+	}
+	fprintf( earlyLogFile, "Doom3BFG startup log\n" );
+	fprintf( earlyLogFile, "command: %s\n", cmdLine != NULL ? cmdLine : "" );
+	fflush( earlyLogFile );
+}
+
 void Sys_Printf( const char *fmt, ... ) {
 	char		msg[MAXPRINTMSG];
 
@@ -337,6 +402,7 @@ void Sys_Printf( const char *fmt, ... ) {
 	msg[sizeof(msg)-1] = '\0';
 
 	OutputDebugString( msg );
+	Sys_EarlyLogWrite( msg );
 
 	if ( win32.win_outputEditString.GetBool() && idLib::IsMainThread() ) {
 		Conbuf_AppendText( msg );
@@ -569,7 +635,7 @@ Sys_ListFiles
 int Sys_ListFiles( const char *directory, const char *extension, idStrList &list ) {
 	idStr		search;
 	struct _finddata_t findinfo;
-	int			findhandle;
+	intptr_t	findhandle;
 	int			flag;
 
 	if ( !extension) {
@@ -584,12 +650,19 @@ int Sys_ListFiles( const char *directory, const char *extension, idStrList &list
 		flag = _A_SUBDIR;
 	}
 
-	sprintf( search, "%s\\*%s", directory, extension );
+	// idStr's inline buffer is 20 bytes. sprintf() into it overflows the stack
+	// for any real base path (the Steam folder is far longer than that).
+	search = va( "%s\\*%s", directory, extension );
 
 	// search
 	list.Clear();
 
-	findhandle = _findfirst( search, &findinfo );
+	// _findfirst returns intptr_t. On x64 that is a pointer-sized CRT handle.
+	// Storing it in an int truncates it, and the next _findnext/_findclose
+	// calls into ntdll with a bad pointer (access violation). A directory
+	// with no matches returns -1 and never hits that path, which is why
+	// startup survived when no game data was present.
+	findhandle = _findfirst( search.c_str(), &findinfo );
 	if ( findhandle == -1 ) {
 		return -1;
 	}
@@ -846,9 +919,9 @@ DLL Loading
 Sys_DLL_Load
 =====================
 */
-int Sys_DLL_Load( const char *dllName ) {
+intptr_t Sys_DLL_Load( const char *dllName ) {
 	HINSTANCE libHandle = LoadLibrary( dllName );
-	return (int)libHandle;
+	return (intptr_t)libHandle;
 }
 
 /*
@@ -856,7 +929,7 @@ int Sys_DLL_Load( const char *dllName ) {
 Sys_DLL_GetProcAddress
 =====================
 */
-void *Sys_DLL_GetProcAddress( int dllHandle, const char *procName ) {
+void *Sys_DLL_GetProcAddress( intptr_t dllHandle, const char *procName ) {
 	return GetProcAddress( (HINSTANCE)dllHandle, procName ); 
 }
 
@@ -865,7 +938,7 @@ void *Sys_DLL_GetProcAddress( int dllHandle, const char *procName ) {
 Sys_DLL_Unload
 =====================
 */
-void Sys_DLL_Unload( int dllHandle ) {
+void Sys_DLL_Unload( intptr_t dllHandle ) {
 	if ( !dllHandle ) {
 		return;
 	}
@@ -1264,8 +1337,10 @@ void Win_Frame() {
 	}
 }
 
+#if !defined( _M_X64 )
 extern "C" { void _chkstk( int size ); };
 void clrstk();
+#endif
 
 /*
 ====================
@@ -1283,6 +1358,7 @@ void TestChkStk() {
 HackChkStk
 ====================
 */
+#if !defined( _M_X64 )
 void HackChkStk() {
 	DWORD	old;
 	VirtualProtect( _chkstk, 6, PAGE_EXECUTE_READWRITE, &old );
@@ -1291,6 +1367,7 @@ void HackChkStk() {
 
 	TestChkStk();
 }
+#endif
 
 /*
 ====================
@@ -1384,6 +1461,59 @@ EXCEPTION_DISPOSITION __cdecl _except_handler( struct _EXCEPTION_RECORD *Excepti
 	static char msg[ 8192 ];
 	char FPUFlags[2048];
 
+#if defined( _M_X64 )
+	Sys_FPU_PrintStateFlags( FPUFlags, ContextRecord->FltSave.ControlWord,
+										ContextRecord->FltSave.StatusWord,
+										ContextRecord->FltSave.TagWord,
+										ContextRecord->FltSave.ErrorOffset,
+										ContextRecord->FltSave.ErrorSelector,
+										ContextRecord->FltSave.DataOffset,
+										ContextRecord->FltSave.DataSelector );
+
+	sprintf( msg,
+		"Please describe what you were doing when DOOM 3 crashed!\n"
+		"If this text did not pop into your email client please copy and email it to programmers@idsoftware.com\n"
+			"\n"
+			"-= FATAL EXCEPTION =-\n"
+			"\n"
+			"%s\n"
+			"\n"
+			"0x%x at address 0x%p\n"
+			"\n"
+			"%s\n"
+			"\n"
+			"RAX = 0x%016llx RBX = 0x%016llx\n"
+			"RCX = 0x%016llx RDX = 0x%016llx\n"
+			"RSI = 0x%016llx RDI = 0x%016llx\n"
+			"RIP = 0x%016llx RSP = 0x%016llx\n"
+			"RBP = 0x%016llx EFL = 0x%08x\n"
+			"\n"
+			"CS = 0x%04x\n"
+			"SS = 0x%04x\n"
+			"DS = 0x%04x\n"
+			"ES = 0x%04x\n"
+			"FS = 0x%04x\n"
+			"GS = 0x%04x\n"
+			"\n"
+			"%s\n",
+			com_version.GetString(),
+			ExceptionRecord->ExceptionCode,
+			ExceptionRecord->ExceptionAddress,
+			GetExceptionCodeInfo( ExceptionRecord->ExceptionCode ),
+			ContextRecord->Rax, ContextRecord->Rbx,
+			ContextRecord->Rcx, ContextRecord->Rdx,
+			ContextRecord->Rsi, ContextRecord->Rdi,
+			ContextRecord->Rip, ContextRecord->Rsp,
+			ContextRecord->Rbp, ContextRecord->EFlags,
+			ContextRecord->SegCs,
+			ContextRecord->SegSs,
+			ContextRecord->SegDs,
+			ContextRecord->SegEs,
+			ContextRecord->SegFs,
+			ContextRecord->SegGs,
+			FPUFlags
+		);
+#else
 	Sys_FPU_PrintStateFlags( FPUFlags, ContextRecord->FloatSave.ControlWord,
 										ContextRecord->FloatSave.StatusWord,
 										ContextRecord->FloatSave.TagWord,
@@ -1436,6 +1566,7 @@ EXCEPTION_DISPOSITION __cdecl _except_handler( struct _EXCEPTION_RECORD *Excepti
 			ContextRecord->SegGs,
 			FPUFlags
 		);
+#endif
 
 	EmailCrashReport( msg );
 	common->FatalError( msg );
@@ -1454,10 +1585,184 @@ EXCEPTION_DISPOSITION __cdecl _except_handler( struct _EXCEPTION_RECORD *Excepti
 
 /*
 ==================
+Sys_WriteCrashText
+
+Stack-only. Do not call the engine allocator or common->Printf: the heap
+may already be the thing that faulted.
+==================
+*/
+static void Sys_WriteCrashText( HANDLE file, const char *text ) {
+	DWORD written = 0;
+	if ( file == INVALID_HANDLE_VALUE || text == NULL ) {
+		return;
+	}
+	WriteFile( file, text, (DWORD)strlen( text ), &written, NULL );
+}
+
+static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
+	char dir[MAX_PATH];
+	char crashPath[MAX_PATH];
+	char dumpPath[MAX_PATH];
+	char line[1024];
+	char modPath[MAX_PATH];
+
+	if ( info == NULL || info->ExceptionRecord == NULL ) {
+		return EXCEPTION_CONTINUE_SEARCH;
+	}
+
+	Sys_ExeDirectory( dir, sizeof( dir ) );
+	Sys_Format( crashPath, sizeof( crashPath ), "%scrash.txt", dir );
+	Sys_Format( dumpPath, sizeof( dumpPath ), "%scrash.dmp", dir );
+	crashPath[sizeof( crashPath ) - 1] = '\0';
+	dumpPath[sizeof( dumpPath ) - 1] = '\0';
+
+	HANDLE file = CreateFileA( crashPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+
+	EXCEPTION_RECORD *record = info->ExceptionRecord;
+	Sys_Format( line, sizeof( line ), "Unhandled exception 0x%08lx at %p\r\n", record->ExceptionCode, record->ExceptionAddress );
+	line[sizeof( line ) - 1] = '\0';
+	Sys_WriteCrashText( file, line );
+
+	HMODULE faultModule = NULL;
+	modPath[0] = '\0';
+	if ( GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			(LPCSTR)record->ExceptionAddress, &faultModule ) && faultModule != NULL ) {
+		GetModuleFileNameA( faultModule, modPath, sizeof( modPath ) );
+		const char *baseName = modPath;
+		const char *slash = strrchr( modPath, '\\' );
+		if ( slash != NULL ) {
+			baseName = slash + 1;
+		}
+		unsigned long long offset = (unsigned long long)( (uintptr_t)record->ExceptionAddress - (uintptr_t)faultModule );
+		Sys_Format( line, sizeof( line ), "Faulting module: %s+0x%I64x\r\nFull path: %s\r\n", baseName, offset, modPath );
+		line[sizeof( line ) - 1] = '\0';
+		Sys_WriteCrashText( file, line );
+	}
+
+	// Close the text file before the stack walk. SymInitialize can fault again
+	// if the heap is already corrupt, and the module line has to survive that.
+	if ( file != INVALID_HANDLE_VALUE ) {
+		CloseHandle( file );
+		file = INVALID_HANDLE_VALUE;
+	}
+
+	HANDLE process = GetCurrentProcess();
+	HANDLE dump = CreateFileA( dumpPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+	if ( dump != INVALID_HANDLE_VALUE ) {
+		MINIDUMP_EXCEPTION_INFORMATION dumpInfo;
+		dumpInfo.ThreadId = GetCurrentThreadId();
+		dumpInfo.ExceptionPointers = info;
+		dumpInfo.ClientPointers = FALSE;
+		MiniDumpWriteDump( process, GetCurrentProcessId(), dump, MiniDumpNormal, &dumpInfo, NULL, NULL );
+		CloseHandle( dump );
+	}
+
+	file = CreateFileA( crashPath, FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
+
+	HANDLE thread = GetCurrentThread();
+	SymSetOptions( SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES );
+	if ( info->ContextRecord != NULL && SymInitialize( process, NULL, TRUE ) ) {
+		CONTEXT context = *info->ContextRecord;
+		STACKFRAME64 frame;
+		memset( &frame, 0, sizeof( frame ) );
+#if defined( _M_X64 )
+		DWORD machine = IMAGE_FILE_MACHINE_AMD64;
+		frame.AddrPC.Offset = context.Rip;
+		frame.AddrFrame.Offset = context.Rbp;
+		frame.AddrStack.Offset = context.Rsp;
+#else
+		DWORD machine = IMAGE_FILE_MACHINE_I386;
+		frame.AddrPC.Offset = context.Eip;
+		frame.AddrFrame.Offset = context.Ebp;
+		frame.AddrStack.Offset = context.Esp;
+#endif
+		frame.AddrPC.Mode = AddrModeFlat;
+		frame.AddrFrame.Mode = AddrModeFlat;
+		frame.AddrStack.Mode = AddrModeFlat;
+
+		Sys_WriteCrashText( file, "Stack:\r\n" );
+		for ( int i = 0; i < 48; i++ ) {
+			if ( !StackWalk64( machine, process, thread, &frame, &context, NULL, SymFunctionTableAccess64, SymGetModuleBase64, NULL ) ) {
+				break;
+			}
+			if ( frame.AddrPC.Offset == 0 ) {
+				break;
+			}
+
+			alignas( 8 ) char symbolStorage[sizeof( SYMBOL_INFO ) + 256];
+			SYMBOL_INFO *symbol = (SYMBOL_INFO *)symbolStorage;
+			memset( symbolStorage, 0, sizeof( symbolStorage ) );
+			symbol->SizeOfStruct = sizeof( SYMBOL_INFO );
+			symbol->MaxNameLen = 255;
+			DWORD64 displacement = 0;
+			const char *name = "?";
+			if ( SymFromAddr( process, frame.AddrPC.Offset, &displacement, symbol ) && symbol->Name[0] != '\0' ) {
+				name = symbol->Name;
+			}
+
+			const char *sourceFile = NULL;
+			DWORD sourceLine = 0;
+			IMAGEHLP_LINE64 lineInfo;
+			DWORD lineDisplacement = 0;
+			memset( &lineInfo, 0, sizeof( lineInfo ) );
+			lineInfo.SizeOfStruct = sizeof( IMAGEHLP_LINE64 );
+			if ( SymGetLineFromAddr64( process, frame.AddrPC.Offset, &lineDisplacement, &lineInfo ) && lineInfo.FileName != NULL ) {
+				sourceFile = lineInfo.FileName;
+				const char *fileSlash = strrchr( sourceFile, '\\' );
+				if ( fileSlash == NULL ) {
+					fileSlash = strrchr( sourceFile, '/' );
+				}
+				if ( fileSlash != NULL ) {
+					sourceFile = fileSlash + 1;
+				}
+				sourceLine = lineInfo.LineNumber;
+			}
+
+			char frameModule[MAX_PATH];
+			frameModule[0] = '\0';
+			const char *frameName = "";
+			unsigned long long frameOffset = (unsigned long long)frame.AddrPC.Offset;
+			HMODULE frameMod = NULL;
+			if ( GetModuleHandleExA( GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+					(LPCSTR)(uintptr_t)frame.AddrPC.Offset, &frameMod ) && frameMod != NULL ) {
+				GetModuleFileNameA( frameMod, frameModule, sizeof( frameModule ) );
+				frameName = frameModule;
+				const char *slash = strrchr( frameModule, '\\' );
+				if ( slash != NULL ) {
+					frameName = slash + 1;
+				}
+				frameOffset = (unsigned long long)( frame.AddrPC.Offset - (DWORD64)(uintptr_t)frameMod );
+			}
+
+			if ( sourceFile != NULL ) {
+				Sys_Format( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x  %s:%lu\r\n", frameName, frameOffset, name, (unsigned long long)displacement, sourceFile, sourceLine );
+			} else {
+				Sys_Format( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
+			}
+			line[sizeof( line ) - 1] = '\0';
+			Sys_WriteCrashText( file, line );
+		}
+		SymCleanup( process );
+	} else {
+		Sys_WriteCrashText( file, "Stack walk unavailable\r\n" );
+	}
+
+	if ( file != INVALID_HANDLE_VALUE ) {
+		CloseHandle( file );
+	}
+
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/*
+==================
 WinMain
 ==================
 */
 int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow ) {
+
+	SetUnhandledExceptionFilter( Sys_UnhandledExceptionFilter );
+	Sys_OpenEarlyLog( lpCmdLine );
 
 	const HCURSOR hcurSave = ::SetCursor( LoadCursor( 0, IDC_WAIT ) );
 
@@ -1556,6 +1861,7 @@ clrstk
 I tried to get the run time to call this at every function entry, but
 ====================
 */
+#if !defined( _M_X64 )
 static int	parmBytes;
 __declspec( naked ) void clrstk() {
 	// eax = bytes to add to stack
@@ -1584,6 +1890,7 @@ __declspec( naked ) void clrstk() {
         ret
 	}
 }
+#endif
 
 /*
 ==================

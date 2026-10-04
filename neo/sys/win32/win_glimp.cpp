@@ -204,7 +204,7 @@ FakeWndProc
 Only used to get wglExtensions
 ====================
 */
-LONG WINAPI FakeWndProc (
+LRESULT WINAPI FakeWndProc (
     HWND    hWnd,
     UINT    uMsg,
     WPARAM  wParam,

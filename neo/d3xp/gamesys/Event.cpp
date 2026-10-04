@@ -84,6 +84,12 @@ idEventDef::idEventDef( const char *command, const char *formatspec, char return
 		return;
 	}
 
+	// Queued event data is not the script stack. 'd' and 'f' are 32-bit. 'e'/'E'
+	// are an idEntityPtr spawn id (also 32-bit), not a native idEntity*. 'v' is a
+	// packed idVec3. The script VM turns an entity number into an idEntity* only
+	// when it calls ProcessEventArgPtr. Save/Restore below uses these same widths.
+	static_assert( sizeof( idEntityPtr<idEntity> ) == sizeof( int ), "event entity arg is a 32-bit spawn id" );
+
 	// make sure the format for the args is valid, calculate the formatspecindex, and the offsets for each arg
 	bits = 0;
 	argsize = 0;
@@ -334,7 +340,7 @@ idEvent *idEvent::Alloc( const idEventDef *evdef, int numargs, va_list args ) {
 idEvent::CopyArgs
 ================
 */
-void idEvent::CopyArgs( const idEventDef *evdef, int numargs, va_list args, int data[ D_EVENT_MAXARGS ] ) {
+void idEvent::CopyArgs( const idEventDef *evdef, int numargs, va_list args, intptr_t data[ D_EVENT_MAXARGS ] ) {
 	int			i;
 	const char	*format;
 	idEventArg	*arg;
@@ -489,7 +495,7 @@ idEvent::ServiceEvents
 void idEvent::ServiceEvents() {
 	idEvent		*event;
 	int			num;
-	int			args[ D_EVENT_MAXARGS ];
+	intptr_t	args[ D_EVENT_MAXARGS ];
 	int			offset;
 	int			i;
 	int			numargs;
@@ -590,7 +596,7 @@ idEvent::ServiceFastEvents
 void idEvent::ServiceFastEvents() {
 	idEvent	*event;
 	int		num;
-	int			args[ D_EVENT_MAXARGS ];
+	intptr_t	args[ D_EVENT_MAXARGS ];
 	int			offset;
 	int			i;
 	int			numargs;

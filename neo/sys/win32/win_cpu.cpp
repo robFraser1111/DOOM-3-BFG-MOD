@@ -57,17 +57,10 @@ double Sys_GetClockTicks() {
 
 #else
 
-	unsigned long lo, hi;
-
-	__asm {
-		push ebx
-		xor eax, eax
-		cpuid
-		rdtsc
-		mov lo, eax
-		mov hi, edx
-		pop ebx
-	}
+	// Same split the x86 asm used (EAX = low, EDX = high). __rdtsc works on x64.
+	unsigned __int64 tsc = __rdtsc();
+	unsigned long lo = (unsigned long)tsc;
+	unsigned long hi = (unsigned long)( tsc >> 32 );
 	return (double ) lo + (double) 0xFFFFFFFF * hi;
 
 #endif
@@ -92,23 +85,24 @@ double Sys_ClockTicksPerSecond() {
 
 	if ( !ticks ) {
 		HKEY hKey;
-		LPBYTE ProcSpeed;
+		DWORD mhz = 0;
 		DWORD buflen, ret;
 
 		if ( !RegOpenKeyEx( HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &hKey ) ) {
-			ProcSpeed = 0;
-			buflen = sizeof( ProcSpeed );
-			ret = RegQueryValueEx( hKey, "~MHz", NULL, NULL, (LPBYTE) &ProcSpeed, &buflen );
+			buflen = sizeof( mhz );
+			ret = RegQueryValueEx( hKey, "~MHz", NULL, NULL, (LPBYTE)&mhz, &buflen );
 			// If we don't succeed, try some other spellings.
 			if ( ret != ERROR_SUCCESS ) {
-				ret = RegQueryValueEx( hKey, "~Mhz", NULL, NULL, (LPBYTE) &ProcSpeed, &buflen );
+				buflen = sizeof( mhz );
+				ret = RegQueryValueEx( hKey, "~Mhz", NULL, NULL, (LPBYTE)&mhz, &buflen );
 			}
 			if ( ret != ERROR_SUCCESS ) {
-				ret = RegQueryValueEx( hKey, "~mhz", NULL, NULL, (LPBYTE) &ProcSpeed, &buflen );
+				buflen = sizeof( mhz );
+				ret = RegQueryValueEx( hKey, "~mhz", NULL, NULL, (LPBYTE)&mhz, &buflen );
 			}
 			RegCloseKey( hKey );
 			if ( ret == ERROR_SUCCESS ) {
-				ticks = (double) ((unsigned long)ProcSpeed) * 1000000;
+				ticks = (double)mhz * 1000000.0;
 			}
 		}
 	}
@@ -132,6 +126,9 @@ HasCPUID
 ================
 */
 static bool HasCPUID() {
+#if defined( _M_X64 )
+	return true;
+#else
 	__asm 
 	{
 		pushfd						// save eflags
@@ -161,6 +158,7 @@ err:
 	return false;
 good:
 	return true;
+#endif
 }
 
 #define _REG_EAX		0
@@ -174,22 +172,12 @@ CPUID
 ================
 */
 static void CPUID( int func, unsigned regs[4] ) {
-	unsigned regEAX, regEBX, regECX, regEDX;
-
-	__asm pusha
-	__asm mov eax, func
-	__asm __emit 00fh
-	__asm __emit 0a2h
-	__asm mov regEAX, eax
-	__asm mov regEBX, ebx
-	__asm mov regECX, ecx
-	__asm mov regEDX, edx
-	__asm popa
-
-	regs[_REG_EAX] = regEAX;
-	regs[_REG_EBX] = regEBX;
-	regs[_REG_ECX] = regECX;
-	regs[_REG_EDX] = regEDX;
+	int cpuInfo[4] = { 0, 0, 0, 0 };
+	__cpuid( cpuInfo, func );
+	regs[_REG_EAX] = (unsigned)cpuInfo[0];
+	regs[_REG_EBX] = (unsigned)cpuInfo[1];
+	regs[_REG_ECX] = (unsigned)cpuInfo[2];
+	regs[_REG_EDX] = (unsigned)cpuInfo[3];
 }
 
 
@@ -346,13 +334,9 @@ LogicalProcPerPhysicalProc
                                           // processors per physical processor when execute cpuid with 
                                           // eax set to 1
 static unsigned char LogicalProcPerPhysicalProc() {
-	unsigned int regebx = 0;
-	__asm {
-		mov eax, 1
-		cpuid
-		mov regebx, ebx
-	}
-	return (unsigned char) ((regebx & NUM_LOGICAL_BITS) >> 16);
+	unsigned regs[4];
+	CPUID( 1, regs );
+	return (unsigned char) ((regs[_REG_EBX] & NUM_LOGICAL_BITS) >> 16);
 }
 
 /*
@@ -364,13 +348,9 @@ GetAPIC_ID
                                           // initial APIC ID for the processor this code is running on.
                                           // Default value = 0xff if HT is not supported
 static unsigned char GetAPIC_ID() {
-	unsigned int regebx = 0;
-	__asm {
-		mov eax, 1
-		cpuid
-		mov regebx, ebx
-	}
-	return (unsigned char) ((regebx & INITIAL_APIC_ID_BITS) >> 24);
+	unsigned regs[4];
+	CPUID( 1, regs );
+	return (unsigned char) ((regs[_REG_EBX] & INITIAL_APIC_ID_BITS) >> 24);
 }
 
 /*
@@ -409,9 +389,9 @@ int CPUCount( int &logicalNum, int &physicalNum ) {
 
 	if ( logicalNum >= 1 ) {	// > 1 doesn't mean HT is enabled in the BIOS
 		HANDLE hCurrentProcessHandle;
-		DWORD  dwProcessAffinity;
-		DWORD  dwSystemAffinity;
-		DWORD  dwAffinityMask;
+		DWORD_PTR dwProcessAffinity;
+		DWORD_PTR dwSystemAffinity;
+		DWORD_PTR dwAffinityMask;
 
 		// Calculate the appropriate  shifts and mask based on the 
 		// number of logical processors.
@@ -519,10 +499,11 @@ static bool HasDAZ() {
 
 	memset( FXArea, 0, sizeof( FXSaveArea ) );
 
-	__asm {
-		mov		eax, FXArea
-		FXSAVE	[eax]
-	}
+#if defined( _M_X64 )
+	_fxsave64( FXArea );
+#else
+	_fxsave( FXArea );
+#endif
 
 	dwMask = *(DWORD *)&FXArea[28];						// Read the MXCSR Mask
 	return ( ( dwMask & ( 1 << 6 ) ) == ( 1 << 6 ) );	// Return if the DAZ bit is set
@@ -855,6 +836,7 @@ int Sys_FPU_PrintStateFlags( char *ptr, int ctrl, int stat, int tags, int inof, 
 Sys_FPU_StackIsEmpty
 ===============
 */
+#if !defined( _M_X64 )
 bool Sys_FPU_StackIsEmpty() {
 	__asm {
 		mov			eax, statePtr
@@ -1061,6 +1043,32 @@ void Sys_FPU_SetRounding( int rounding ) {
 		fldcw		word ptr [eax]
 	}
 }
+#else
+// MSVC x64 emits SSE2 for float and double, so the x87 control word does not
+// affect compiled math. These stay as no-ops so startup still calls them.
+bool Sys_FPU_StackIsEmpty() {
+	return true;
+}
+
+void Sys_FPU_ClearStack() {
+}
+
+const char *Sys_FPU_GetState() {
+	return "FPU State: x64 SSE2 (x87 control word is not used by compiled code)\n";
+}
+
+void Sys_FPU_EnableExceptions( int exceptions ) {
+	(void)exceptions;
+}
+
+void Sys_FPU_SetPrecision( int precision ) {
+	(void)precision;
+}
+
+void Sys_FPU_SetRounding( int rounding ) {
+	(void)rounding;
+}
+#endif
 
 /*
 ================
@@ -1068,19 +1076,13 @@ Sys_FPU_SetDAZ
 ================
 */
 void Sys_FPU_SetDAZ( bool enable ) {
-	DWORD dwData;
-
-	_asm {
-		movzx	ecx, byte ptr enable
-		and		ecx, 1
-		shl		ecx, 6
-		STMXCSR	dword ptr dwData
-		mov		eax, dwData
-		and		eax, ~(1<<6)	// clear DAX bit
-		or		eax, ecx		// set the DAZ bit
-		mov		dwData, eax
-		LDMXCSR	dword ptr dwData
+	unsigned int mxcsr = _mm_getcsr();
+	if ( enable ) {
+		mxcsr |= ( 1u << 6 );
+	} else {
+		mxcsr &= ~( 1u << 6 );
 	}
+	_mm_setcsr( mxcsr );
 }
 
 /*
@@ -1089,17 +1091,11 @@ Sys_FPU_SetFTZ
 ================
 */
 void Sys_FPU_SetFTZ( bool enable ) {
-	DWORD dwData;
-
-	_asm {
-		movzx	ecx, byte ptr enable
-		and		ecx, 1
-		shl		ecx, 15
-		STMXCSR	dword ptr dwData
-		mov		eax, dwData
-		and		eax, ~(1<<15)	// clear FTZ bit
-		or		eax, ecx		// set the FTZ bit
-		mov		dwData, eax
-		LDMXCSR	dword ptr dwData
+	unsigned int mxcsr = _mm_getcsr();
+	if ( enable ) {
+		mxcsr |= ( 1u << 15 );
+	} else {
+		mxcsr &= ~( 1u << 15 );
 	}
+	_mm_setcsr( mxcsr );
 }

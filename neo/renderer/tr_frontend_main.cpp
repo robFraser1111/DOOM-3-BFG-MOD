@@ -76,7 +76,10 @@ void R_ToggleSmpFrame() {
 	frameData = &smpFrameData[smpFrame % NUM_FRAME_DATA];
 
 	// reset the memory allocation
-	const unsigned int bytesNeededForAlignment = FRAME_ALLOC_ALIGNMENT - ( (unsigned int)frameData->frameMemory & ( FRAME_ALLOC_ALIGNMENT - 1 ) );
+	// Alignment lives in the low bits. Mask the full address so a 4GB boundary
+	// cannot change how many bytes are skipped.
+	const uintptr_t alignedBits = (uintptr_t)frameData->frameMemory & (uintptr_t)( FRAME_ALLOC_ALIGNMENT - 1 );
+	const unsigned int bytesNeededForAlignment = (unsigned int)( FRAME_ALLOC_ALIGNMENT - alignedBits );
 	frameData->frameMemoryAllocated.SetValue( bytesNeededForAlignment );
 	frameData->frameMemoryUsed.SetValue( 0 );
 

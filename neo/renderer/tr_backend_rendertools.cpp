@@ -721,10 +721,10 @@ static void RB_ShowSilhouette() {
 					continue;
 				}
 
-				qglBindBufferARB( GL_ARRAY_BUFFER_ARB, (GLuint)vertexBuffer.GetAPIObject() );
+				qglBindBufferARB( GL_ARRAY_BUFFER_ARB, vertexBuffer.GetAPIObject() );
 				int vertOffset = vertexBuffer.GetOffset();
 
-				qglVertexPointer( 3, GL_FLOAT, sizeof( idShadowVert ), (void *)vertOffset );
+				qglVertexPointer( 3, GL_FLOAT, sizeof( idShadowVert ), (void *)(uintptr_t)vertOffset );
 				qglBegin( GL_LINES );
 
 				for ( int j = 0; j < tri->numIndexes; j+=3 ) {

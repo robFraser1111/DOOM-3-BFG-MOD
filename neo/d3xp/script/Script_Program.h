@@ -39,7 +39,7 @@ class idSaveGame;
 class idRestoreGame;
 
 #define MAX_STRING_LEN		128
-#define MAX_GLOBALS			296608			// in bytes
+#define MAX_GLOBALS			393216			// in bytes. Slots are pointer-sized, so this is larger than the original 32-bit image.
 #define MAX_STRINGS			1024
 
 #define MAX_FUNCS			3584
@@ -68,7 +68,7 @@ public:
 	int 				firstStatement;
 	int 				numStatements;
 	int 				parmTotal;
-	int 				locals; 			// total ints of parms + locals
+	int 				locals; 			// bytes of parms + locals
 	int					filenum; 			// source file defined in
 	idList<int, TAG_SCRIPT>			parmSize;
 };
@@ -459,6 +459,8 @@ private:
 	int											top_files;
 
 	void										CompileStats();
+	byte *										ReserveMem( int size );
+	idVarDef *									AllocVarDef( idTypeDef *type, const char *name, idVarDef *scope );
 
 public:
 	idVarDef									*returnDef;

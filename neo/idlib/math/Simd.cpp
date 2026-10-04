@@ -130,25 +130,13 @@ long baseClocks = 0;
 
 #pragma warning(disable : 4731)     // frame pointer register 'ebx' modified by inline assembly code
 
-long saved_ebx = 0;
-
+// Low 32 bits of the TSC, same value the old x86 asm stored from EAX.
+// __rdtsc() compiles for both Win32 and x64; MSVC x64 has no inline asm.
 #define StartRecordTime( start )			\
-	__asm mov saved_ebx, ebx				\
-	__asm xor eax, eax						\
-	__asm cpuid								\
-	__asm rdtsc								\
-	__asm mov start, eax					\
-	__asm xor eax, eax						\
-	__asm cpuid
+	start = (int)__rdtsc()
 
 #define StopRecordTime( end )				\
-	__asm xor eax, eax						\
-	__asm cpuid								\
-	__asm rdtsc								\
-	__asm mov end, eax						\
-	__asm mov ebx, saved_ebx				\
-	__asm xor eax, eax						\
-	__asm cpuid
+	end = (int)__rdtsc()
 
 
 #define GetBest( start, end, best )			\

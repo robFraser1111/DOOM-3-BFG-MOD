@@ -5,13 +5,25 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Retail|Win32">
       <Configuration>Retail</Configuration>
       <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Retail|x64">
+      <Configuration>Retail</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -29,15 +41,15 @@
     </SccAuxPath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -47,7 +59,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="_Common.props" />
     <Import Project="_Game-d3xp.props" />
@@ -55,14 +67,14 @@
     <Import Project="_WithInlines.props" />
     <Import Project="_PCLibs.props" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="_Common.props" />
     <Import Project="_Game-d3xp.props" />
     <Import Project="_Release.props" />
     <Import Project="_PCLibs.props" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="_Common.props" />
     <Import Project="_Game-d3xp.props" />
@@ -72,17 +84,17 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
-    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
-    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
-    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
-    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" />
-    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
-    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" />
+    <CodeAnalysisRuleSet Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleSet Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRules Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">
     <PreBuildEvent>
       <Command>
       </Command>
@@ -92,7 +104,7 @@
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">
     <PreBuildEvent>
       <Command>
       </Command>
@@ -101,7 +113,7 @@
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">
     <PreBuildEvent>
       <Command>
       </Command>
@@ -208,9 +220,9 @@
     <ClCompile Include="d3xp\physics\Physics_StaticMulti.cpp" />
     <ClCompile Include="d3xp\physics\Push.cpp" />
     <ClCompile Include="d3xp\precompiled.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="d3xp\script\Script_Compiler.cpp" />
     <ClCompile Include="d3xp\script\Script_Interpreter.cpp" />

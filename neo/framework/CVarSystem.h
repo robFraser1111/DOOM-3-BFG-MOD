@@ -277,6 +277,10 @@ extern idCVarSystem *		cvarSystem;
 ===============================================================================
 */
 
+// 0xFFFFFFFF means RegisterStaticVars has not run yet. It is not a cvar address.
+// Widen the constant through uintptr_t so the compare is the same bits on x64.
+static const uintptr_t idCVarStaticSentinel = 0xFFFFFFFFu;
+
 ID_INLINE void idCVar::Init( const char *name, const char *value, int flags, const char *description,
 							float valueMin, float valueMax, const char **valueStrings, argCompletion_t valueCompletion ) {
 	this->name = name;
@@ -291,7 +295,7 @@ ID_INLINE void idCVar::Init( const char *name, const char *value, int flags, con
 	this->integerValue = 0;
 	this->floatValue = 0.0f;
 	this->internalVar = this;
-	if ( staticVars != (idCVar *)0xFFFFFFFF ) {
+	if ( staticVars != reinterpret_cast<idCVar *>( idCVarStaticSentinel ) ) {
 		this->next = staticVars;
 		staticVars = this;
 	} else {
@@ -300,11 +304,11 @@ ID_INLINE void idCVar::Init( const char *name, const char *value, int flags, con
 }
 
 ID_INLINE void idCVar::RegisterStaticVars() {
-	if ( staticVars != (idCVar *)0xFFFFFFFF ) {
+	if ( staticVars != reinterpret_cast<idCVar *>( idCVarStaticSentinel ) ) {
 		for ( idCVar *cvar = staticVars; cvar; cvar = cvar->next ) {
 			cvarSystem->Register( cvar );
 		}
-		staticVars = (idCVar *)0xFFFFFFFF;
+		staticVars = reinterpret_cast<idCVar *>( idCVarStaticSentinel );
 	}
 }
 

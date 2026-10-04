@@ -5,13 +5,25 @@
       <Configuration>Debug</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Retail|Win32">
       <Configuration>Retail</Configuration>
       <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Retail|x64">
+      <Configuration>Retail</Configuration>
+      <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -29,16 +41,16 @@
     </SccAuxPath>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -46,7 +58,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="_Common.props" />
     <Import Project="_DoomExe.props" />
@@ -54,14 +66,14 @@
     <Import Project="_WithInlines.props" />
     <Import Project="_PCLibs.props" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="_Common.props" />
     <Import Project="_DoomExe.props" />
     <Import Project="_Release.props" />
     <Import Project="_PCLibs.props" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" Label="PropertySheets">
+  <ImportGroup Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
     <Import Project="_Common.props" />
     <Import Project="_DoomExe.props" />
@@ -71,29 +83,23 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
-    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
-    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
-    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
-    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
-    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" />
-    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" />
-    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'" />
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(VCInstallDir)PlatformSDK\include;$(ProjectDir)dxsdk_June2010\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(VCInstallDir)PlatformSDK\lib;$(ProjectDir)dxsdk_June2010\lib\x86;$(LibraryPath)</LibraryPath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(VCInstallDir)PlatformSDK\lib;$(ProjectDir)dxsdk_June2010\lib\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(VCInstallDir)PlatformSDK\include;$(ProjectDir)dxsdk_June2010\include;$(IncludePath)</IncludePath>
-    <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">$(VCInstallDir)PlatformSDK\lib;$(ProjectDir)dxsdk_June2010\lib\x86;$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">$(VCInstallDir)PlatformSDK\include;$(ProjectDir)dxsdk_June2010\include;$(IncludePath)</IncludePath>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleSet Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRules Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRules Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')" />
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
     <Link>
-      <GenerateDebugInformation Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</GenerateDebugInformation>
-      <GenerateDebugInformation Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">true</GenerateDebugInformation>
+      <GenerateDebugInformation Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</GenerateDebugInformation>
+      <GenerateDebugInformation Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</GenerateDebugInformation>
     </Link>
     <Deploy />
     <Deploy />
@@ -101,15 +107,12 @@
     <ClCompile />
     <ClCompile />
     <ClCompile>
-      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</TreatWarningAsError>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(DXSDK_DIR)\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</TreatWarningAsError>
     </ClCompile>
     <ClCompile>
-      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</TreatWarningAsError>
-      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">true</TreatWarningAsError>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(DXSDK_DIR)\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">$(DXSDK_DIR)\Include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">NDEBUG;%(PreprocessorDefinitions);ID_RETAIL</PreprocessorDefinitions>
+      <TreatWarningAsError Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</TreatWarningAsError>
+      <TreatWarningAsError Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</TreatWarningAsError>
+      <PreprocessorDefinitions Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NDEBUG;%(PreprocessorDefinitions);ID_RETAIL</PreprocessorDefinitions>
     </ClCompile>
     <ImageXex />
     <ImageXex />
@@ -119,13 +122,13 @@
     <Link />
     <ClCompile />
     <Manifest>
-      <EnableDPIAwareness Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</EnableDPIAwareness>
+      <EnableDPIAwareness Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</EnableDPIAwareness>
     </Manifest>
     <Manifest>
-      <EnableDPIAwareness Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</EnableDPIAwareness>
+      <EnableDPIAwareness Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</EnableDPIAwareness>
     </Manifest>
     <Manifest>
-      <EnableDPIAwareness Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">true</EnableDPIAwareness>
+      <EnableDPIAwareness Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">true</EnableDPIAwareness>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -335,9 +338,9 @@
     <ClCompile Include="framework\KeyInput.cpp" />
     <ClCompile Include="framework\PlayerProfile.cpp" />
     <ClCompile Include="framework\precompiled.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="framework\TokenParser.cpp" />
     <ClCompile Include="framework\Unzip.cpp" />
@@ -363,24 +366,24 @@
     <ClCompile Include="renderer\Image_program.cpp" />
     <ClCompile Include="renderer\Interaction.cpp" />
     <ClCompile Include="renderer\jobs\prelightshadowvolume\PreLightShadowVolume.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="renderer\jobs\ShadowShared.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="renderer\jobs\staticshadowvolume\StaticShadowVolume.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="renderer\jobs\dynamicshadowvolume\DynamicShadowVolume.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Retail|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Debug' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Release' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)'=='Retail' And ('$(Platform)'=='Win32' Or '$(Platform)'=='x64')">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="renderer\Material.cpp" />
     <ClCompile Include="renderer\Model.cpp" />
@@ -517,7 +520,7 @@
     <ResourceCompile Include="sys\win32\rc\doom.rc" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\doomclassic\doomclassic.vcxproj" Condition="'$(Platform)'=='Win32'">
+    <ProjectReference Include="..\doomclassic\doomclassic.vcxproj" Condition="'$(Platform)'=='Win32' Or '$(Platform)'=='x64'">
       <Project>{d87adc61-3968-4a89-824f-01365ab6bd88}</Project>
       <Private>false</Private>
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
@@ -525,7 +528,7 @@
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
-    <ProjectReference Include="..\doomclassic\timidity\timidity.vcxproj" Condition="'$(Platform)'=='Win32'">
+    <ProjectReference Include="..\doomclassic\timidity\timidity.vcxproj" Condition="'$(Platform)'=='Win32' Or '$(Platform)'=='x64'">
       <Project>{3267f0ed-fe57-4348-91d7-aa8a4976750f}</Project>
       <Private>false</Private>
       <ReferenceOutputAssembly>true</ReferenceOutputAssembly>

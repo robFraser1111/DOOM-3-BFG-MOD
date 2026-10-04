@@ -21,8 +21,14 @@ Note that Doom 3 BFG Edition is available from the Steam store at
 http://store.steampowered.com/app/208200/
 
 
-Compiling on win32:
--------------------
+Compiling on Windows:
+---------------------
+
+See BUILDING.md. neo\doom3.sln builds with Visual Studio 2022 (v143) for
+Release|x64. The June 2010 DirectX SDK is not required; XAudio2, XInput, and
+DirectInput come from the Windows SDK.
+
+The original Visual Studio 2010 notes were:
 
 A project file for Microsoft Visual Studio 2010 is provided in neo\doom3.sln
 We expect the solution file is compatible with the Express releases
