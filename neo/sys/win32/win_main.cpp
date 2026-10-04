@@ -335,6 +335,24 @@ Sys_Printf
 // filesystem is up, which is too late for the startup crash.
 static FILE *	earlyLogFile = NULL;
 
+// idStr turns _vsnprintf into an object-like macro. This helper calls the CRT.
+#pragma push_macro( "_vsnprintf" )
+#undef _vsnprintf
+static int Sys_Format( char *dest, size_t destSize, const char *fmt, ... ) {
+	va_list ap;
+	int n;
+
+	if ( dest == NULL || destSize == 0 ) {
+		return -1;
+	}
+	va_start( ap, fmt );
+	n = _vsnprintf( dest, destSize, fmt, ap );
+	va_end( ap );
+	dest[destSize - 1] = '\0';
+	return n;
+}
+#pragma pop_macro( "_vsnprintf" )
+
 static void Sys_ExeDirectory( char *out, size_t outSize ) {
 	DWORD n = GetModuleFileNameA( NULL, out, (DWORD)outSize );
 	if ( n == 0 || n >= outSize ) {
@@ -362,7 +380,7 @@ static void Sys_OpenEarlyLog( const char *cmdLine ) {
 	char path[MAX_PATH];
 
 	Sys_ExeDirectory( dir, sizeof( dir ) );
-	(_snprintf)( path, sizeof( path ), "%sDoom3BFG.log", dir );
+	Sys_Format( path, sizeof( path ), "%sDoom3BFG.log", dir );
 	path[sizeof( path ) - 1] = '\0';
 
 	earlyLogFile = fopen( path, "w" );
@@ -1593,15 +1611,15 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 	}
 
 	Sys_ExeDirectory( dir, sizeof( dir ) );
-	(_snprintf)( crashPath, sizeof( crashPath ), "%scrash.txt", dir );
-	(_snprintf)( dumpPath, sizeof( dumpPath ), "%scrash.dmp", dir );
+	Sys_Format( crashPath, sizeof( crashPath ), "%scrash.txt", dir );
+	Sys_Format( dumpPath, sizeof( dumpPath ), "%scrash.dmp", dir );
 	crashPath[sizeof( crashPath ) - 1] = '\0';
 	dumpPath[sizeof( dumpPath ) - 1] = '\0';
 
 	HANDLE file = CreateFileA( crashPath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL );
 
 	EXCEPTION_RECORD *record = info->ExceptionRecord;
-	(_snprintf)( line, sizeof( line ), "Unhandled exception 0x%08lx at %p\r\n", record->ExceptionCode, record->ExceptionAddress );
+	Sys_Format( line, sizeof( line ), "Unhandled exception 0x%08lx at %p\r\n", record->ExceptionCode, record->ExceptionAddress );
 	line[sizeof( line ) - 1] = '\0';
 	Sys_WriteCrashText( file, line );
 
@@ -1616,7 +1634,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 			baseName = slash + 1;
 		}
 		unsigned long long offset = (unsigned long long)( (uintptr_t)record->ExceptionAddress - (uintptr_t)faultModule );
-		(_snprintf)( line, sizeof( line ), "Faulting module: %s+0x%I64x\r\nFull path: %s\r\n", baseName, offset, modPath );
+		Sys_Format( line, sizeof( line ), "Faulting module: %s+0x%I64x\r\nFull path: %s\r\n", baseName, offset, modPath );
 		line[sizeof( line ) - 1] = '\0';
 		Sys_WriteCrashText( file, line );
 	}
@@ -1698,7 +1716,7 @@ static LONG WINAPI Sys_UnhandledExceptionFilter( EXCEPTION_POINTERS *info ) {
 				frameOffset = (unsigned long long)( frame.AddrPC.Offset - (DWORD64)(uintptr_t)frameMod );
 			}
 
-			(_snprintf)( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
+			Sys_Format( line, sizeof( line ), "  %s+0x%I64x  %s+0x%I64x\r\n", frameName, frameOffset, name, (unsigned long long)displacement );
 			line[sizeof( line ) - 1] = '\0';
 			Sys_WriteCrashText( file, line );
 		}
