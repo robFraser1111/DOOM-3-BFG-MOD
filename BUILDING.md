@@ -74,6 +74,12 @@ folder.
 The first thing the game loads from `base` is `default.cfg`. If that file is
 missing, the engine stops with `Couldn't load default.cfg`.
 
+Release writes `Doom3BFG.pdb` next to the executable. On startup the game also
+writes `Doom3BFG.log` in that same folder (console text, flushed every line).
+An unhandled crash writes `crash.txt` and `crash.dmp` there too: exception
+code, faulting module and offset, and a DbgHelp stack. Those three files are
+the ones to keep if the process dies before a window appears.
+
 ## Known limitations
 
 - **No Steam.** No overlay, achievements, leaderboards, matchmaking, or roaming

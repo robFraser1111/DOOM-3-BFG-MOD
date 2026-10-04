@@ -461,7 +461,16 @@ idFileSystemLocal::DirectFileLength
 ================
 */
 int idFileSystemLocal::DirectFileLength( idFileHandle o ) {
-	return GetFileSize( o, NULL );
+	LARGE_INTEGER len;
+	if ( !GetFileSizeEx( o, &len ) || len.QuadPart < 0 ) {
+		return -1;
+	}
+	// idFile::Length() is a signed int. A DWORD from GetFileSize() between
+	// 2GB and 4GB became a negative length and was then passed to Mem_Alloc.
+	if ( len.QuadPart > 0x7fffffffLL ) {
+		return -1;
+	}
+	return (int)len.QuadPart;
 }
 
 /*

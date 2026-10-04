@@ -1302,7 +1302,13 @@ idFile_Permanent::Tell
 =================
 */
 int idFile_Permanent::Tell() const {
-	return SetFilePointer( o, 0, NULL, FILE_CURRENT );
+	LARGE_INTEGER zero;
+	LARGE_INTEGER pos;
+	zero.QuadPart = 0;
+	if ( !SetFilePointerEx( o, zero, &pos, FILE_CURRENT ) ) {
+		return -1;
+	}
+	return (int)pos.QuadPart;
 }
 
 /*
@@ -1332,13 +1338,21 @@ idFile_Permanent::Seek
 =================
 */
 int idFile_Permanent::Seek( long offset, fsOrigin_t origin ) {
-	int retVal = INVALID_SET_FILE_POINTER;
+	LARGE_INTEGER dist;
+	DWORD method;
+	dist.QuadPart = offset;
 	switch( origin ) {
-		case FS_SEEK_CUR: retVal = SetFilePointer( o, offset, NULL, FILE_CURRENT ); break;
-		case FS_SEEK_END: retVal = SetFilePointer( o, offset, NULL, FILE_END ); break;
-		case FS_SEEK_SET: retVal = SetFilePointer( o, offset, NULL, FILE_BEGIN ); break;
+		case FS_SEEK_CUR: method = FILE_CURRENT; break;
+		case FS_SEEK_END: method = FILE_END; break;
+		case FS_SEEK_SET: method = FILE_BEGIN; break;
+		default: return -1;
 	}
-	return ( retVal == INVALID_SET_FILE_POINTER ) ? -1 : 0;
+	// SetFilePointer's high dword was passed as NULL, so a position at
+	// 0xFFFFFFFF was reported as failure. Ex reports the real position.
+	if ( !SetFilePointerEx( o, dist, NULL, method ) ) {
+		return -1;
+	}
+	return 0;
 }
 
 #if 1
